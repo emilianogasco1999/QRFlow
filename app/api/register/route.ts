@@ -6,11 +6,11 @@ export async function POST(req: Request) {
   try {
     await dbConnect();
     const body = await req.json();
-    const { instagram, whatsapp, email, dob, location, referral } = body;
+    const { instagram, whatsapp, email, dob, location, referral, fullName, dni } = body;
 
-    if (!instagram || !whatsapp || !email || !dob || !location || !referral) {
+    if (!instagram || !whatsapp || !email || !dob || !location || !referral || !fullName) {
       return NextResponse.json(
-        { success: false, error: "Todos los campos son obligatorios" },
+        { success: false, error: "Todos los campos obligatorios son requeridos" },
         { status: 400 }
       );
     }
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     const qrToken = crypto.randomUUID();
 
     const newRegistration = new Registration({
+      fullName: fullName.trim(),
       instagram: sanitizedInstagram,
       whatsapp: whatsapp.trim(),
       email: email.trim().toLowerCase(),
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
       location,
       referral,
       qrToken,
+      dni: dni ? dni.trim() : undefined,
     });
 
     await newRegistration.save();

@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IRegistration extends Document {
+  fullName: string;
   instagram: string;
   whatsapp: string;
   email: string;
@@ -10,11 +11,17 @@ export interface IRegistration extends Document {
   qrToken: string;
   emailSent: boolean;
   attended: boolean;
+  paid: boolean;
   dni?: string;
   createdAt: Date;
 }
 
 const RegistrationSchema: Schema = new Schema({
+  fullName: {
+    type: String,
+    required: [true, "El nombre y apellido es requerido"],
+    trim: true,
+  },
   instagram: {
     type: String,
     required: [true, "El Instagram es requerido"],
@@ -56,6 +63,10 @@ const RegistrationSchema: Schema = new Schema({
     default: false,
   },
   attended: {
+    type: Boolean,
+    default: false,
+  },
+  paid: {
     type: Boolean,
     default: false,
   },

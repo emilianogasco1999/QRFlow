@@ -20,6 +20,7 @@ import {
 
 interface RegistrationItem {
   _id: string;
+  fullName: string;
   instagram: string;
   whatsapp: string;
   email: string;
@@ -31,6 +32,7 @@ interface RegistrationItem {
   emailSent: boolean;
   attended?: boolean;
   dni?: string;
+  paid: boolean;
 }
 
 export default function AdminDashboard() {
@@ -82,10 +84,20 @@ export default function AdminDashboard() {
 
   // Estados para Carga de DNI
   const [isDniModalOpen, setIsDniModalOpen] = useState(false);
-  const [dniTargetUser, setDniTargetUser] = useState<RegistrationItem | null>(null);
+  const [dniTargetUser, setDniTargetUser] = useState<RegistrationItem | null>(
+    null,
+  );
   const [dniInput, setDniInput] = useState("");
   const [isDniSaving, setIsDniSaving] = useState(false);
   const [dniError, setDniError] = useState("");
+
+  // Estados para Carga de Pago
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentTargetUser, setPaymentTargetUser] =
+    useState<RegistrationItem | null>(null);
+  const [isPaymentSaving, setIsPaymentSaving] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   // Debounce para la búsqueda del servidor
@@ -133,7 +145,13 @@ export default function AdminDashboard() {
     if (isAuthenticated) {
       fetchData();
     }
-  }, [currentPage, itemsPerPage, debouncedSearch, filterStatus, isAuthenticated]);
+  }, [
+    currentPage,
+    itemsPerPage,
+    debouncedSearch,
+    filterStatus,
+    isAuthenticated,
+  ]);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -250,8 +268,10 @@ export default function AdminDashboard() {
 
       setList((prevList) =>
         prevList.map((item) =>
-          item._id === dniTargetUser._id ? { ...item, dni: data.user.dni } : item
-        )
+          item._id === dniTargetUser._id
+            ? { ...item, dni: data.user.dni }
+            : item,
+        ),
       );
 
       setIsDniModalOpen(false);
@@ -261,6 +281,43 @@ export default function AdminDashboard() {
       setDniError(err.message);
     } finally {
       setIsDniSaving(false);
+    }
+  };
+
+  const handleSavePayment = async (paidValue: boolean) => {
+    if (!paymentTargetUser) return;
+    setIsPaymentSaving(true);
+    setPaymentError("");
+    try {
+      const res = await fetch("/api/admin/registrations", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: paymentTargetUser._id,
+          paid: paidValue,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.error || "Error al actualizar el estado del pago.",
+        );
+      }
+
+      setList((prevList) =>
+        prevList.map((item) =>
+          item._id === paymentTargetUser._id
+            ? { ...item, paid: data.user.paid }
+            : item,
+        ),
+      );
+
+      setIsPaymentModalOpen(false);
+      setPaymentTargetUser(null);
+    } catch (err: any) {
+      setPaymentError(err.message);
+    } finally {
+      setIsPaymentSaving(false);
     }
   };
 
@@ -648,394 +705,454 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <div className="bg-spotify-surface rounded-xl overflow-hidden border border-white/5 spotify-shadow-heavy">
-                {/* Vista Web (Tabla) */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-white/10 bg-black/20 text-xs font-bold uppercase tracking-wider text-spotify-text-secondary">
-                        <th className="p-3 pl-4">instagram</th>
-                        <th className="p-3">whatsapp</th>
-                        <th className="p-3">email</th>
-                        <th className="p-3">dni</th>
-                        <th className="p-3 text-center">fecha nac.</th>
-                        <th className="p-3">ubicación</th>
-                        <th className="p-3">referencia</th>
-                        <th className="p-3 text-center">estado</th>
-                        <th className="p-3 pr-4 text-center">acción</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5 text-xs text-spotify-text-near">
-                      {paginatedList.map((user) => {
-                        const status = emailStatus[user._id] || "idle";
-                        const statusMsg = statusMessage[user._id] || "";
+              {/* Vista Web (Tabla) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-black/20 text-xs font-bold uppercase tracking-wider text-spotify-text-secondary">
+                      <th className="p-3 pl-4">nombre / ig</th>
+                      <th className="p-3">whatsapp</th>
+                      <th className="p-3">email</th>
+                      <th className="p-3">dni</th>
+                      <th className="p-3 text-center">fecha nac.</th>
+                      <th className="p-3">ubicación</th>
+                      <th className="p-3">referencia</th>
+                      <th className="p-3 text-center">pagado</th>
+                      <th className="p-3 text-center">estado</th>
+                      <th className="p-3 pr-4 text-center">acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-xs text-spotify-text-near">
+                    {paginatedList.map((user) => {
+                      const status = emailStatus[user._id] || "idle";
+                      const statusMsg = statusMessage[user._id] || "";
 
-                        return (
-                          <tr
-                            key={user._id}
-                            className="hover:bg-white/[0.02] transition-colors"
-                          >
-                            {/* Instagram Link */}
-                            <td className="p-3 pl-4 font-semibold text-white whitespace-nowrap">
+                      return (
+                        <tr
+                          key={user._id}
+                          className="hover:bg-white/[0.02] transition-colors"
+                        >
+                          {/* Nombre y Link de Instagram */}
+                          <td className="p-3 pl-4 font-semibold text-white whitespace-nowrap">
+                            <div className="flex flex-col">
+                              <span className="text-white font-bold">
+                                {user.fullName || "Sin Nombre"}
+                              </span>
                               <a
                                 href={`https://instagram.com/${user.instagram}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 hover:text-spotify-accent transition-colors"
+                                className="flex items-center gap-1 text-[11px] text-spotify-text-secondary hover:text-spotify-accent transition-colors"
                               >
                                 @{user.instagram}
                                 <ExternalLink
-                                  size={12}
+                                  size={10}
                                   className="opacity-50"
                                 />
                               </a>
-                            </td>
+                            </div>
+                          </td>
 
-                            {/* WhatsApp Link */}
-                            <td className="p-3 whitespace-nowrap">
-                              <a
-                                href={`https://wa.me/${user.whatsapp.replace(/\+/g, "")}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 hover:text-spotify-accent transition-colors"
-                              >
-                                {user.whatsapp}
-                                <ExternalLink
-                                  size={12}
-                                  className="opacity-50"
-                                />
-                              </a>
-                            </td>
-
-                            {/* Email */}
-                            <td className="p-3 truncate max-w-[140px]" title={user.email}>
-                              {user.email}
-                            </td>
-
-                            {/* DNI */}
-                            <td className="p-3 font-semibold text-white/90 whitespace-nowrap">
-                              {user.dni || "-"}
-                            </td>
-
-                            {/* Fecha de Nacimiento */}
-                            <td className="p-3 text-center whitespace-nowrap">{user.dob}</td>
-
-                            {/* Ubicación */}
-                            <td className="p-3 whitespace-nowrap">{user.location}</td>
-
-                            {/* Cómo nos conoció */}
-                            <td className="p-3 max-w-[100px] truncate" title={user.referral}>
-                              {user.referral}
-                            </td>
-
-                            {/* Estado (Pendiente, Vino, No vino) */}
-                            <td className="p-3 text-center whitespace-nowrap">
-                              {!user.emailSent ? (
-                                <span className="bg-white/5 text-white/40 border border-white/10 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                  Pendiente
-                                </span>
-                              ) : user.attended ? (
-                                <span className="bg-green-500/10 text-green-400 border border-green-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                  Vino
-                                </span>
-                              ) : (
-                                <span className="bg-white/5 text-white/30 border border-white/10 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                  No Vino
-                                </span>
-                              )}
-                            </td>
-
-                            {/* Acciones */}
-                            <td className="p-3 pr-4 text-center whitespace-nowrap">
-                              <div className="flex flex-col items-center justify-center gap-1 min-w-[100px]">
-                                {!user.dni ? (
-                                  <button
-                                    onClick={() => {
-                                      setDniTargetUser(user);
-                                      setDniInput("");
-                                      setIsDniModalOpen(true);
-                                    }}
-                                    className="bg-spotify-accent hover:opacity-90 active:scale-95 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all"
-                                  >
-                                    Cargar DNI
-                                  </button>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleSendEmail(user)}
-                                      disabled={status === "sending"}
-                                      className={`flex items-center justify-center gap-1 w-full ${
-                                        user.emailSent
-                                          ? "bg-white/10 hover:bg-white/20 text-white/60 border border-white/10"
-                                          : "bg-spotify-accent hover:opacity-90 text-white"
-                                      } disabled:opacity-50 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95`}
-                                    >
-                                      {status === "sending" ? (
-                                        <Loader2
-                                          className="animate-spin"
-                                          size={10}
-                                        />
-                                      ) : (
-                                        <Mail size={10} />
-                                      )}
-                                      {user.emailSent
-                                        ? "Reenviar"
-                                        : "Enviar Mail"}
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setDniTargetUser(user);
-                                        setDniInput(user.dni || "");
-                                        setIsDniModalOpen(true);
-                                      }}
-                                      className="text-[9px] text-spotify-text-secondary hover:text-white transition-colors underline"
-                                    >
-                                      Editar DNI
-                                    </button>
-                                  </>
-                                )}
-
-                                {user.emailSent && status === "idle" && (
-                                  <span className="text-[9px] text-green-400 font-medium">
-                                    Enviado
-                                  </span>
-                                )}
-
-                                {statusMsg && (
-                                  <span
-                                    className={`text-[9px] mt-0.5 font-medium ${
-                                      status === "success"
-                                        ? "text-green-400"
-                                        : status === "error"
-                                          ? "text-spotify-error"
-                                          : "text-spotify-text-secondary"
-                                    }`}
-                                  >
-                                    {statusMsg}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Vista Mobile (Tarjetas/Filas) */}
-                <div className="md:hidden divide-y divide-white/5">
-                  {paginatedList.map((user) => {
-                    const status = emailStatus[user._id] || "idle";
-                    const statusMsg = statusMessage[user._id] || "";
-
-                    return (
-                      <div
-                        key={user._id}
-                        className="p-5 space-y-4 hover:bg-white/[0.01] transition-colors"
-                      >
-                        {/* Fila superior: Instagram & Estado */}
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="min-w-0">
-                            <a
-                              href={`https://instagram.com/${user.instagram}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-white font-bold hover:text-spotify-accent transition-colors text-base truncate"
-                            >
-                              @{user.instagram}
-                              <ExternalLink
-                                size={14}
-                                className="opacity-50 flex-shrink-0"
-                              />
-                            </a>
-                            <p className="text-spotify-text-secondary text-xs mt-1">
-                              Nac: {user.dob} • {user.location}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                            {!user.emailSent ? (
-                              <span className="bg-white/5 text-white/40 border border-white/10 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                Pendiente
-                              </span>
-                            ) : user.attended ? (
-                              <span className="bg-green-500/10 text-green-400 border border-green-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                Vino
-                              </span>
-                            ) : (
-                              <span className="bg-white/5 text-white/30 border border-white/10 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                No vino
-                              </span>
-                            )}
-                          </div>
-                        </div>
- 
-                        {/* Detalles de contacto */}
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-spotify-text-near bg-black/10 p-3 rounded-lg">
-                          <div>
-                            <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
-                              WhatsApp
-                            </span>
+                          {/* WhatsApp Link */}
+                          <td className="p-3 whitespace-nowrap">
                             <a
                               href={`https://wa.me/${user.whatsapp.replace(/\+/g, "")}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="hover:text-spotify-accent transition-colors font-medium break-all"
+                              className="flex items-center gap-1 hover:text-spotify-accent transition-colors"
                             >
                               {user.whatsapp}
+                              <ExternalLink size={12} className="opacity-50" />
                             </a>
-                          </div>
-                          <div>
-                            <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
-                              Email
+                          </td>
+
+                          {/* Email */}
+                          <td
+                            className="p-3 truncate max-w-[140px]"
+                            title={user.email}
+                          >
+                            {user.email}
+                          </td>
+
+                          {/* DNI */}
+                          <td className="p-3 font-semibold text-white/90 whitespace-nowrap">
+                            {user.dni || "-"}
+                          </td>
+
+                          {/* Fecha de Nacimiento */}
+                          <td className="p-3 text-center whitespace-nowrap">
+                            {user.dob}
+                          </td>
+
+                          {/* Ubicación */}
+                          <td className="p-3 whitespace-nowrap">
+                            {user.location}
+                          </td>
+
+                          {/* Cómo nos conoció */}
+                          <td
+                            className="p-3 max-w-[100px] truncate"
+                            title={user.referral}
+                          >
+                            {user.referral}
+                          </td>
+
+                          {/* Pago */}
+                          <td className="p-3 text-center whitespace-nowrap">
+                            <button
+                              onClick={() => {
+                                setPaymentTargetUser(user);
+                                setIsPaymentModalOpen(true);
+                              }}
+                              className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all active:scale-95 uppercase tracking-wider ${
+                                user.paid
+                                  ? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
+                                  : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
+                              }`}
+                            >
+                              {user.paid ? "pagado" : "Pendiente"}
+                            </button>
+                          </td>
+
+                          {/* Estado (Pendiente, Vino, No vino) */}
+                          <td className="p-3 text-center whitespace-nowrap">
+                            {!user.emailSent ? (
+                              <span className="bg-white/5 text-white/40 border border-white/10 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                Pendiente
+                              </span>
+                            ) : user.attended ? (
+                              <span className="bg-green-500/10 text-green-400 border border-green-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                Vino
+                              </span>
+                            ) : (
+                              <span className="bg-white/5 text-white/30 border border-white/10 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                No Vino
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Acciones */}
+                          <td className="p-3 pr-4 text-center whitespace-nowrap">
+                            <div className="flex flex-col items-center justify-center gap-1 min-w-[100px]">
+                              {!user.dni ? (
+                                <button
+                                  onClick={() => {
+                                    setDniTargetUser(user);
+                                    setDniInput("");
+                                    setIsDniModalOpen(true);
+                                  }}
+                                  className="bg-spotify-accent hover:opacity-90 active:scale-95 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all"
+                                >
+                                  Cargar DNI
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => handleSendEmail(user)}
+                                    disabled={
+                                      status === "sending" || !user.paid
+                                    }
+                                    className={`flex items-center justify-center gap-1 w-full ${
+                                      user.emailSent
+                                        ? "bg-white/10 hover:bg-white/20 text-white/60 border border-white/10"
+                                        : user.paid
+                                          ? "bg-spotify-accent hover:opacity-90 text-white"
+                                          : "bg-white/5 text-white/20 border border-white/5 cursor-not-allowed"
+                                    } disabled:opacity-50 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95`}
+                                  >
+                                    {status === "sending" ? (
+                                      <Loader2
+                                        className="animate-spin"
+                                        size={10}
+                                      />
+                                    ) : (
+                                      <Mail size={10} />
+                                    )}
+                                    {user.emailSent
+                                      ? "Reenviar"
+                                      : "Enviar Mail"}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setDniTargetUser(user);
+                                      setDniInput(user.dni || "");
+                                      setIsDniModalOpen(true);
+                                    }}
+                                    className="text-[9px] text-spotify-text-secondary hover:text-white transition-colors underline"
+                                  >
+                                    Editar DNI
+                                  </button>
+                                </>
+                              )}
+
+                              {user.emailSent && status === "idle" && (
+                                <span className="text-[9px] text-green-400 font-medium">
+                                  Enviado
+                                </span>
+                              )}
+
+                              {statusMsg && (
+                                <span
+                                  className={`text-[9px] mt-0.5 font-medium ${
+                                    status === "success"
+                                      ? "text-green-400"
+                                      : status === "error"
+                                        ? "text-spotify-error"
+                                        : "text-spotify-text-secondary"
+                                  }`}
+                                >
+                                  {statusMsg}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Vista Mobile (Tarjetas/Filas) */}
+              <div className="md:hidden divide-y divide-white/5">
+                {paginatedList.map((user) => {
+                  const status = emailStatus[user._id] || "idle";
+                  const statusMsg = statusMessage[user._id] || "";
+
+                  return (
+                    <div
+                      key={user._id}
+                      className="p-5 space-y-4 hover:bg-white/[0.01] transition-colors"
+                    >
+                      {/* Fila superior: Nombre, Instagram & Estado */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0">
+                          <h2 className="text-white font-bold text-base leading-tight">
+                            {user.fullName || "Sin Nombre"}
+                          </h2>
+                          <a
+                            href={`https://instagram.com/${user.instagram}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-spotify-text-secondary hover:text-spotify-accent text-xs mt-1 transition-colors truncate"
+                          >
+                            @{user.instagram}
+                            <ExternalLink
+                              size={11}
+                              className="opacity-50 flex-shrink-0"
+                            />
+                          </a>
+                          <p className="text-spotify-text-secondary text-[11px] mt-1">
+                            Nac: {user.dob} • {user.location}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          {!user.emailSent ? (
+                            <span className="bg-white/5 text-white/40 border border-white/10 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              Pendiente
                             </span>
-                            <span className="break-all font-medium">
-                              {user.email}
+                          ) : user.attended ? (
+                            <span className="bg-green-500/10 text-green-400 border border-green-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              Vino
                             </span>
-                          </div>
-                          <div className="col-span-2 border-t border-white/5 pt-2 mt-1">
-                            <div className="flex justify-between items-start gap-4">
-                              <div>
-                                <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
-                                  DNI
-                                </span>
-                                <span className="font-semibold text-white">
-                                  {user.dni || "No cargado"}
-                                </span>
-                              </div>
-                              <div className="min-w-0">
-                                <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
-                                  Referencia
-                                </span>
-                                <p className="italic text-spotify-text-secondary truncate">
-                                  "{user.referral}"
-                                </p>
-                              </div>
+                          ) : (
+                            <span className="bg-white/5 text-white/30 border border-white/10 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              No vino
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Detalles de contacto */}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-spotify-text-near bg-black/10 p-3 rounded-lg">
+                        <div>
+                          <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
+                            WhatsApp
+                          </span>
+                          <a
+                            href={`https://wa.me/${user.whatsapp.replace(/\+/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-spotify-accent transition-colors font-medium break-all"
+                          >
+                            {user.whatsapp}
+                          </a>
+                        </div>
+                        <div>
+                          <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
+                            Email
+                          </span>
+                          <span className="break-all font-medium">
+                            {user.email}
+                          </span>
+                        </div>
+                        <div className="col-span-2 border-t border-white/5 pt-2 mt-1">
+                          <div className="flex justify-between items-start gap-4">
+                            <div>
+                              <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
+                                DNI
+                              </span>
+                              <span className="font-semibold text-white">
+                                {user.dni || "No cargado"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
+                                Pago
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setPaymentTargetUser(user);
+                                  setIsPaymentModalOpen(true);
+                                }}
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded-full border transition-all active:scale-95 uppercase tracking-wider ${
+                                  user.paid
+                                    ? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
+                                    : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
+                                }`}
+                              >
+                                {user.paid ? "pagado ✅" : "Pendiente"}
+                              </button>
+                            </div>
+                            <div className="min-w-0 max-w-[120px]">
+                              <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
+                                Referencia
+                              </span>
+                              <p
+                                className="italic text-spotify-text-secondary truncate"
+                                title={user.referral}
+                              >
+                                "{user.referral}"
+                              </p>
                             </div>
                           </div>
                         </div>
- 
-                        {/* Botón de acción */}
-                        <div className="flex flex-col gap-2 pt-1">
-                          {!user.dni ? (
+                      </div>
+
+                      {/* Botón de acción */}
+                      <div className="flex flex-col gap-2 pt-1">
+                        {!user.dni ? (
+                          <button
+                            onClick={() => {
+                              setDniTargetUser(user);
+                              setDniInput("");
+                              setIsDniModalOpen(true);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 bg-spotify-accent hover:opacity-90 active:scale-95 text-white py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all"
+                          >
+                            Cargar DNI
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleSendEmail(user)}
+                              disabled={status === "sending" || !user.paid}
+                              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95 ${
+                                user.emailSent
+                                  ? "bg-white/10 hover:bg-white/20 text-white/70 border border-white/10"
+                                  : user.paid
+                                    ? "bg-spotify-accent hover:opacity-90 text-white"
+                                    : "bg-white/5 text-white/20 border border-white/5 cursor-not-allowed"
+                              }`}
+                            >
+                              {status === "sending" ? (
+                                <Loader2 className="animate-spin" size={14} />
+                              ) : (
+                                <Mail size={14} />
+                              )}
+                              {user.emailSent ? "Reenviar Mail" : "Enviar Mail"}
+                            </button>
                             <button
                               onClick={() => {
                                 setDniTargetUser(user);
-                                setDniInput("");
+                                setDniInput(user.dni || "");
                                 setIsDniModalOpen(true);
                               }}
-                              className="w-full flex items-center justify-center gap-2 bg-spotify-accent hover:opacity-90 active:scale-95 text-white py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all"
+                              className="w-full text-center text-spotify-text-secondary hover:text-white transition-colors text-xs font-bold uppercase tracking-wider py-1"
                             >
-                              Cargar DNI
+                              Editar DNI
                             </button>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => handleSendEmail(user)}
-                                disabled={status === "sending"}
-                                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95 ${
-                                  user.emailSent
-                                    ? "bg-white/10 hover:bg-white/20 text-white/70 border border-white/10"
-                                    : "bg-spotify-accent hover:opacity-90 text-white"
-                                }`}
-                              >
-                                {status === "sending" ? (
-                                  <Loader2 className="animate-spin" size={14} />
-                                ) : (
-                                  <Mail size={14} />
-                                )}
-                                {user.emailSent ? "Reenviar Mail" : "Enviar Mail"}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setDniTargetUser(user);
-                                  setDniInput(user.dni || "");
-                                  setIsDniModalOpen(true);
-                                }}
-                                className="w-full text-center text-spotify-text-secondary hover:text-white transition-colors text-xs font-bold uppercase tracking-wider py-1"
-                              >
-                                Editar DNI
-                              </button>
-                            </>
-                          )}
+                          </>
+                        )}
 
-                          {statusMsg && (
-                            <span
-                              className={`text-center text-[10px] mt-1 font-medium ${
-                                status === "success"
-                                  ? "text-green-400"
-                                  : status === "error"
-                                    ? "text-spotify-error"
-                                    : "text-spotify-text-secondary"
-                              }`}
-                            >
-                              {statusMsg}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Paginación */}
-                {totalItems > 0 && (
-                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 border-t border-white/5 bg-black/10 text-sm">
-                    <span className="text-spotify-text-secondary text-xs">
-                      Mostrando {startIndex + 1} -{" "}
-                      {Math.min(startIndex + itemsPerPage, totalItems)}{" "}
-                      de {totalItems} registros
-                    </span>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-xs text-spotify-text-secondary font-bold">
-                        <span>MOSTRAR:</span>
-                        <select
-                          value={itemsPerPage}
-                          onChange={(e) => {
-                            setItemsPerPage(Number(e.target.value));
-                            setCurrentPage(1);
-                          }}
-                          className="bg-spotify-button hover:bg-spotify-card border border-white/10 rounded-full px-2 py-1 text-xs text-white focus:outline-none transition-colors cursor-pointer"
-                        >
-                          <option value="5">5</option>
-                          <option value="10">10</option>
-                          <option value="20">20</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(1, prev - 1))
-                          }
-                          disabled={validCurrentPage === 1}
-                          className="flex items-center gap-1 bg-spotify-button hover:bg-spotify-card border border-white/10 px-3 py-1.5 rounded-full text-xs font-bold transition-colors disabled:opacity-30 disabled:pointer-events-none"
-                        >
-                          <ChevronLeft size={14} />
-                          Anterior
-                        </button>
-                        <span className="text-xs font-bold text-white px-2">
-                          Página {validCurrentPage} de {totalPages}
-                        </span>
-                        <button
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(totalPages, prev + 1),
-                            )
-                          }
-                          disabled={validCurrentPage === totalPages}
-                          className="flex items-center gap-1 bg-spotify-button hover:bg-spotify-card border border-white/10 px-3 py-1.5 rounded-full text-xs font-bold transition-colors disabled:opacity-30 disabled:pointer-events-none"
-                        >
-                          Siguiente
-                          <ChevronRight size={14} />
-                        </button>
+                        {statusMsg && (
+                          <span
+                            className={`text-center text-[10px] mt-1 font-medium ${
+                              status === "success"
+                                ? "text-green-400"
+                                : status === "error"
+                                  ? "text-spotify-error"
+                                  : "text-spotify-text-secondary"
+                            }`}
+                          >
+                            {statusMsg}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
-            )}
-          </div>
+
+              {/* Paginación */}
+              {totalItems > 0 && (
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 border-t border-white/5 bg-black/10 text-sm">
+                  <span className="text-spotify-text-secondary text-xs">
+                    Mostrando {startIndex + 1} -{" "}
+                    {Math.min(startIndex + itemsPerPage, totalItems)} de{" "}
+                    {totalItems} registros
+                  </span>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs text-spotify-text-secondary font-bold">
+                      <span>MOSTRAR:</span>
+                      <select
+                        value={itemsPerPage}
+                        onChange={(e) => {
+                          setItemsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="bg-spotify-button hover:bg-spotify-card border border-white/10 rounded-full px-2 py-1 text-xs text-white focus:outline-none transition-colors cursor-pointer"
+                      >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          setCurrentPage((prev) => Math.max(1, prev - 1))
+                        }
+                        disabled={validCurrentPage === 1}
+                        className="flex items-center gap-1 bg-spotify-button hover:bg-spotify-card border border-white/10 px-3 py-1.5 rounded-full text-xs font-bold transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                      >
+                        <ChevronLeft size={14} />
+                        Anterior
+                      </button>
+                      <span className="text-xs font-bold text-white px-2">
+                        Página {validCurrentPage} de {totalPages}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setCurrentPage((prev) =>
+                            Math.min(totalPages, prev + 1),
+                          )
+                        }
+                        disabled={validCurrentPage === totalPages}
+                        className="flex items-center gap-1 bg-spotify-button hover:bg-spotify-card border border-white/10 px-3 py-1.5 rounded-full text-xs font-bold transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                      >
+                        Siguiente
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modal de Confirmación para borrar base de datos */}
@@ -1162,6 +1279,12 @@ export default function AdminDashboard() {
 
                 <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-3 text-sm">
                   <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-spotify-text-secondary">Nombre:</span>
+                    <span className="font-bold text-white">
+                      {scannedUser.fullName || "Sin Nombre"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
                     <span className="text-spotify-text-secondary">
                       Instagram:
                     </span>
@@ -1255,7 +1378,9 @@ export default function AdminDashboard() {
                 📋 Cargar DNI del Invitado
               </h2>
               <p className="text-spotify-text-secondary text-xs text-center">
-                Ingresá el número de documento para @{dniTargetUser.instagram}
+                Ingresá el documento para{" "}
+                <strong>{dniTargetUser.fullName || "Sin Nombre"}</strong> (@
+                {dniTargetUser.instagram})
               </p>
             </div>
 
@@ -1298,11 +1423,74 @@ export default function AdminDashboard() {
                   disabled={isDniSaving}
                   className="bg-spotify-accent hover:opacity-90 active:scale-95 text-white px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {isDniSaving && <Loader2 className="animate-spin" size={12} />}
+                  {isDniSaving && (
+                    <Loader2 className="animate-spin" size={12} />
+                  )}
                   Guardar
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Registro/Edición de Pago */}
+      {isPaymentModalOpen && paymentTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-spotify-surface border border-white/10 max-w-sm w-full rounded-2xl p-6 spotify-shadow-heavy">
+            <div className="flex flex-col items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-spotify-accent/10 border border-spotify-accent/20 rounded-full flex items-center justify-center text-[#f6ebdd] text-lg font-bold">
+                $
+              </div>
+              <h2 className="text-lg font-bold text-white text-center">
+                ¿Este usuario pagó?
+              </h2>
+              <p className="text-spotify-text-secondary text-xs text-center leading-relaxed">
+                Modificando estado de pago para{" "}
+                <strong>{paymentTargetUser.fullName || "Sin Nombre"}</strong> (@
+                {paymentTargetUser.instagram})
+              </p>
+            </div>
+
+            {paymentError && (
+              <div className="text-[11px] text-spotify-error bg-spotify-error/10 border border-spotify-error/20 p-2.5 rounded-lg font-medium text-center mb-4">
+                {paymentError}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2.5">
+              <div className="flex justify-between items-center gap-3">
+                <button
+                  onClick={() => handleSavePayment(false)}
+                  disabled={isPaymentSaving}
+                  className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+                >
+                  No
+                </button>
+                <button
+                  onClick={() => handleSavePayment(true)}
+                  disabled={isPaymentSaving}
+                  className="flex-1 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isPaymentSaving && (
+                    <Loader2 className="animate-spin" size={12} />
+                  )}
+                  Sí
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsPaymentModalOpen(false);
+                  setPaymentTargetUser(null);
+                  setPaymentError("");
+                }}
+                disabled={isPaymentSaving}
+                className="w-full text-center text-spotify-text-secondary hover:text-white transition-colors text-xs font-bold uppercase tracking-wider py-1.5 mt-1"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

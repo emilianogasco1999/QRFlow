@@ -113,7 +113,7 @@ export async function PUT(req: Request) {
     }
 
     await dbConnect();
-    const { id, dni } = await req.json();
+    const { id, dni, paid } = await req.json();
 
     if (!id) {
       return NextResponse.json(
@@ -122,9 +122,13 @@ export async function PUT(req: Request) {
       );
     }
 
+    const updateData: any = {};
+    if (dni !== undefined) updateData.dni = dni ? dni.trim() : "";
+    if (paid !== undefined) updateData.paid = paid;
+
     const user = await Registration.findByIdAndUpdate(
       id,
-      { dni: dni ? dni.trim() : "" },
+      updateData,
       { new: true },
     );
 
@@ -139,7 +143,7 @@ export async function PUT(req: Request) {
   } catch (error: any) {
     console.error("Error en PUT /api/admin/registrations:", error);
     return NextResponse.json(
-      { success: false, error: "Error al actualizar el DNI: " + error.message },
+      { success: false, error: "Error al actualizar el registro: " + error.message },
       { status: 500 },
     );
   }
