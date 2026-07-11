@@ -183,7 +183,7 @@ export async function POST(req: Request) {
               <p class="subtitle">QRFLOW ACCESS CONTROL</p>
             </div>
             <div class="content">
-              <p class="salutation">Hola @${user.instagram}</p>
+              <p class="salutation">Hola @${user.fullName}</p>
               <p>Tu solicitud de acceso ha sido aprobada. Presentá este código QR único al ingresar al evento. Recordá que tu entrada es personal e intransferible.</p>
               <div class="qr-container">
                 <div class="qr-wrapper">
@@ -192,16 +192,16 @@ export async function POST(req: Request) {
               </div>
               <div class="details-box">
                 <div class="detail-row">
-                  <span class="detail-label">Email:</span>
-                  <span class="detail-value">${user.email}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">WhatsApp:</span>
-                  <span class="detail-value">${user.whatsapp}</span>
+                  <span class="detail-label">Nombre:</span>
+                  <span class="detail-value">${user.fullName}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">DNI:</span>
                   <span class="detail-value">${user.dni}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">WhatsApp:</span>
+                  <span class="detail-value">${user.whatsapp}</span>
                 </div>
               </div>
             </div>
