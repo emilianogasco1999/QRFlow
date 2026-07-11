@@ -574,93 +574,80 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <Loader2 className="animate-spin text-spotify-accent" size={32} />
-            <p className="text-spotify-text-secondary text-sm">
-              Cargando registros...
-            </p>
-          </div>
-        ) : list.length === 0 ? (
-          <div className="text-center py-20 bg-spotify-surface rounded-xl border border-white/5 spotify-shadow-medium">
-            <p className="text-spotify-text-secondary text-base">
-              No hay solicitudes cargadas todavía.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Controles de Búsqueda, Filtrado y Borrado */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
-              {/* Buscador */}
-              <div className="relative flex-1 max-w-lg">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <Search className="text-spotify-text-secondary" size={16} />
-                </span>
-                <input
-                  type="text"
-                  placeholder="Buscar por instagram, whatsapp, email..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full pl-10 pr-4 py-2 text-sm text-white placeholder-spotify-text-secondary focus:outline-none transition-colors"
-                />
-              </div>
-
-              {/* Filtro y Borrar BD */}
-              <div className="flex flex-wrap items-center gap-3">
-                <select
-                  value={filterStatus}
-                  onChange={(e) => {
-                    setFilterStatus(
-                      e.target.value as
-                        | "all"
-                        | "sent"
-                        | "pending"
-                        | "attended"
-                        | "not-attended",
-                    );
-                    setCurrentPage(1);
-                  }}
-                  className="bg-spotify-button hover:bg-spotify-card border border-white/10 rounded-full px-4 py-2 text-xs font-bold text-spotify-text-near focus:outline-none transition-colors cursor-pointer"
-                >
-                  <option value="all">TODOS LOS REGISTROS</option>
-                  <option value="pending">PENDIENTES</option>
-                  <option value="sent">MAILS ENVIADOS</option>
-                  <option value="attended">VINO</option>
-                  <option value="not-attended">NO VINO</option>
-                </select>
-
-                {filterStatus === "sent" && (
-                  <button
-                    onClick={() => setIsScannerOpen(true)}
-                    className="flex items-center gap-1.5 bg-spotify-accent hover:opacity-90 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95"
-                  >
-                    <Camera size={13} />
-                    Escanear QR
-                  </button>
-                )}
-
-                {/* <button
-                  onClick={() => setIsDeleteOpen(true)}
-                  className="flex items-center gap-1.5 bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 hover:border-red-500/50 text-red-400 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95"
-                >
-                  <Trash2 size={13} />
-                  Borrar BD
-                </button> */}
-              </div>
+        {/* Controles de Búsqueda, Filtrado y Borrado (Siempre visibles) */}
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+            {/* Buscador */}
+            <div className="relative flex-1 max-w-lg">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Search className="text-spotify-text-secondary" size={16} />
+              </span>
+              <input
+                type="text"
+                placeholder="Buscar por instagram, whatsapp, email..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full pl-10 pr-4 py-2 text-sm text-white placeholder-spotify-text-secondary focus:outline-none transition-colors"
+              />
             </div>
 
-            {/* Tabla y Resultados */}
-            {filteredList.length === 0 ? (
-              <div className="text-center py-20 bg-spotify-surface rounded-xl border border-white/5 spotify-shadow-medium">
-                <p className="text-spotify-text-secondary text-base">
-                  No se encontraron registros que coincidan con la búsqueda.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-spotify-surface rounded-xl overflow-hidden border border-white/5 spotify-shadow-heavy">
+            {/* Filtro y Borrar BD */}
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(
+                    e.target.value as
+                      | "all"
+                      | "sent"
+                      | "pending"
+                      | "attended"
+                      | "not-attended",
+                  );
+                  setCurrentPage(1);
+                }}
+                className="bg-spotify-button hover:bg-spotify-card border border-white/10 rounded-full px-4 py-2 text-xs font-bold text-spotify-text-near focus:outline-none transition-colors cursor-pointer"
+              >
+                <option value="all">TODOS LOS REGISTROS</option>
+                <option value="pending">PENDIENTES</option>
+                <option value="sent">MAILS ENVIADOS</option>
+                <option value="attended">VINO</option>
+                <option value="not-attended">NO VINO</option>
+              </select>
+
+              {filterStatus === "sent" && (
+                <button
+                  onClick={() => setIsScannerOpen(true)}
+                  className="flex items-center gap-1.5 bg-spotify-accent hover:opacity-90 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95"
+                >
+                  <Camera size={13} />
+                  Escanear QR
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Estado de Carga o Resultados */}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4 bg-spotify-surface rounded-xl border border-white/5 spotify-shadow-medium">
+              <Loader2 className="animate-spin text-spotify-accent" size={32} />
+              <p className="text-spotify-text-secondary text-sm">
+                Cargando registros...
+              </p>
+            </div>
+          ) : list.length === 0 ? (
+            <div className="text-center py-20 bg-spotify-surface rounded-xl border border-white/5 spotify-shadow-medium">
+              <p className="text-spotify-text-secondary text-base">
+                {searchQuery.trim() !== "" || filterStatus !== "all"
+                  ? "No se encontraron registros que coincidan con la búsqueda."
+                  : "No hay solicitudes cargadas todavía."}
+              </p>
+            </div>
+          ) : (
+            <div className="bg-spotify-surface rounded-xl overflow-hidden border border-white/5 spotify-shadow-heavy">
                 {/* Vista Web (Tabla) */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-left border-collapse">
@@ -1049,7 +1036,6 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-        )}
       </div>
 
       {/* Modal de Confirmación para borrar base de datos */}
