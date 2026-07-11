@@ -3,6 +3,8 @@ import { dbConnect } from "@/lib/db";
 import Registration from "@/models/Registration";
 import { cookies } from "next/headers";
 
+export const dynamic = "force-dynamic";
+
 async function isAuthorized(): Promise<boolean> {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get("admin_auth");
