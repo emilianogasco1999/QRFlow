@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     if (!(await isAuthorized())) {
       return NextResponse.json(
         { success: false, error: "No autorizado" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     if (!registrationId) {
       return NextResponse.json(
         { success: false, error: "Falta el dato obligatorio (registrationId)" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Registro no encontrado" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -183,7 +183,7 @@ export async function POST(req: Request) {
               <p class="subtitle">QRFLOW ACCESS CONTROL</p>
             </div>
             <div class="content">
-              <p class="salutation">Hola @${user.instagram},</p>
+              <p class="salutation">Hola @${user.instagram}</p>
               <p>Tu solicitud de acceso ha sido aprobada. Presentá este código QR único al ingresar al evento. Recordá que tu entrada es personal e intransferible.</p>
               <div class="qr-container">
                 <div class="qr-wrapper">
@@ -200,14 +200,14 @@ export async function POST(req: Request) {
                   <span class="detail-value">${user.whatsapp}</span>
                 </div>
                 <div class="detail-row">
-                  <span class="detail-label">Ubicación:</span>
-                  <span class="detail-value">${user.location}</span>
+                  <span class="detail-label">DNI:</span>
+                  <span class="detail-value">${user.dni}</span>
                 </div>
               </div>
             </div>
             <div class="footer">
               <div class="footer-note">
-                Este correo es automático. Si tenés alguna duda sobre tu acceso o el evento, respondé directamente a este mensaje.
+                Este correo es automático. No responder este mail
               </div>
               <div class="brand">
                 QRFlow &copy; 2026
@@ -229,16 +229,19 @@ export async function POST(req: Request) {
       // Reemplazar cid por url real para que se previsualice en el navegador local
       const previewHtml = emailHtml.replace("cid:qr-code", qrUrl);
       fs.writeFileSync(path.join(scratchDir, "last-email.html"), previewHtml);
-      
+
       // Actualizar estado en base de datos
       user.emailSent = true;
       await user.save();
 
-      console.log("RESEND_API_KEY no configurada. Email simulado guardado en scratch/last-email.html");
-      return NextResponse.json({ 
-        success: true, 
-        mocked: true, 
-        message: "Email simulado guardado localmente en scratch/last-email.html" 
+      console.log(
+        "RESEND_API_KEY no configurada. Email simulado guardado en scratch/last-email.html",
+      );
+      return NextResponse.json({
+        success: true,
+        mocked: true,
+        message:
+          "Email simulado guardado localmente en scratch/last-email.html",
       });
     }
 
@@ -266,8 +269,11 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("Error en /api/admin/send-email:", error);
     return NextResponse.json(
-      { success: false, error: "Error enviando correo electrónico: " + error.message },
-      { status: 500 }
+      {
+        success: false,
+        error: "Error enviando correo electrónico: " + error.message,
+      },
+      { status: 500 },
     );
   }
 }

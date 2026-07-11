@@ -30,10 +30,13 @@ interface RegistrationItem {
   createdAt: string;
   emailSent: boolean;
   attended?: boolean;
+  dni?: string;
 }
 
 export default function AdminDashboard() {
   const [list, setList] = useState<RegistrationItem[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -77,11 +80,38 @@ export default function AdminDashboard() {
   const [changePasswordError, setChangePasswordError] = useState("");
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
 
+  // Estados para Carga de DNI
+  const [isDniModalOpen, setIsDniModalOpen] = useState(false);
+  const [dniTargetUser, setDniTargetUser] = useState<RegistrationItem | null>(null);
+  const [dniInput, setDniInput] = useState("");
+  const [isDniSaving, setIsDniSaving] = useState(false);
+  const [dniError, setDniError] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce para la búsqueda del servidor
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Al cambiar el término de búsqueda o filtro, volvemos a la página 1
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, filterStatus]);
+
   const fetchData = async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/registrations");
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        search: debouncedSearch,
+        status: filterStatus,
+      });
+      const res = await fetch(`/api/admin/registrations?${params.toString()}`);
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(
@@ -89,12 +119,21 @@ export default function AdminDashboard() {
         );
       }
       setList(data.list || []);
+      setTotalItems(data.total || 0);
+      setTotalPages(data.totalPages || 1);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  // Traer datos del servidor cuando cambien los parámetros de paginado/filtros
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchData();
+    }
+  }, [currentPage, itemsPerPage, debouncedSearch, filterStatus, isAuthenticated]);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -104,7 +143,6 @@ export default function AdminDashboard() {
         if (res.ok && data.authenticated) {
           setIsAuthenticated(true);
           setIsDefaultPassword(!!data.isDefaultPassword);
-          await fetchData();
         }
       } catch (err) {
         console.error("Error validando autenticación:", err);
@@ -134,7 +172,6 @@ export default function AdminDashboard() {
       }
       setIsAuthenticated(true);
       setIsDefaultPassword(!!data.isDefaultPassword);
-      fetchData();
     } catch (err: any) {
       setLoginError(err.message);
     } finally {
@@ -183,6 +220,47 @@ export default function AdminDashboard() {
       setChangePasswordError(err.message);
     } finally {
       setChangePasswordLoading(false);
+    }
+  };
+
+  const handleSaveDni = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dniTargetUser) return;
+
+    if (!dniInput.trim()) {
+      setDniError("El DNI no puede estar vacío.");
+      return;
+    }
+
+    setIsDniSaving(true);
+    setDniError("");
+    try {
+      const res = await fetch("/api/admin/registrations", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: dniTargetUser._id,
+          dni: dniInput,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al guardar el DNI.");
+      }
+
+      setList((prevList) =>
+        prevList.map((item) =>
+          item._id === dniTargetUser._id ? { ...item, dni: data.user.dni } : item
+        )
+      );
+
+      setIsDniModalOpen(false);
+      setDniTargetUser(null);
+      setDniInput("");
+    } catch (err: any) {
+      setDniError(err.message);
+    } finally {
+      setIsDniSaving(false);
     }
   };
 
@@ -358,40 +436,11 @@ export default function AdminDashboard() {
     };
   }, [isScannerOpen]);
 
-  // 1. Filtrar lista
-  const filteredList = list.filter((user) => {
-    const query = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      (user.instagram || "").toLowerCase().includes(query) ||
-      (user.whatsapp || "").toLowerCase().includes(query) ||
-      (user.email || "").toLowerCase().includes(query) ||
-      (user.location || "").toLowerCase().includes(query) ||
-      (user.referral || "").toLowerCase().includes(query);
-
-    if (filterStatus === "pending") {
-      return matchesSearch && !user.emailSent;
-    }
-
-    if (filterStatus === "sent") {
-      return matchesSearch && user.emailSent;
-    }
-    if (filterStatus === "attended") {
-      return matchesSearch && user.emailSent && user.attended;
-    }
-    if (filterStatus === "not-attended") {
-      return matchesSearch && user.emailSent && !user.attended;
-    }
-    return matchesSearch;
-  });
-
-  // 2. Paginar lista
-  const totalPages = Math.ceil(filteredList.length / itemsPerPage);
+  // Ya no filtramos ni paginamos en el cliente, la API se encarga de todo en el servidor.
+  const filteredList = list;
+  const paginatedList = list;
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages || 1);
   const startIndex = (validCurrentPage - 1) * itemsPerPage;
-  const paginatedList = filteredList.slice(
-    startIndex,
-    startIndex + itemsPerPage,
-  );
 
   if (isAuthChecking) {
     return (
@@ -617,17 +666,18 @@ export default function AdminDashboard() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-white/10 bg-black/20 text-xs font-bold uppercase tracking-wider text-spotify-text-secondary">
-                        <th className="p-4">instagram</th>
-                        <th className="p-4">whatsapp</th>
-                        <th className="p-4">email</th>
-                        <th className="p-4 text-center">fecha nac.</th>
-                        <th className="p-4">ubicación</th>
-                        <th className="p-4">referencia</th>
-                        <th className="p-4 text-center">estado</th>
-                        <th className="p-4 text-right">acción</th>
+                        <th className="p-3 pl-4">instagram</th>
+                        <th className="p-3">whatsapp</th>
+                        <th className="p-3">email</th>
+                        <th className="p-3">dni</th>
+                        <th className="p-3 text-center">fecha nac.</th>
+                        <th className="p-3">ubicación</th>
+                        <th className="p-3">referencia</th>
+                        <th className="p-3 text-center">estado</th>
+                        <th className="p-3 pr-4 text-center">acción</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5 text-sm text-spotify-text-near">
+                    <tbody className="divide-y divide-white/5 text-xs text-spotify-text-near">
                       {paginatedList.map((user) => {
                         const status = emailStatus[user._id] || "idle";
                         const statusMsg = statusMessage[user._id] || "";
@@ -638,7 +688,7 @@ export default function AdminDashboard() {
                             className="hover:bg-white/[0.02] transition-colors"
                           >
                             {/* Instagram Link */}
-                            <td className="p-4 font-semibold text-white">
+                            <td className="p-3 pl-4 font-semibold text-white whitespace-nowrap">
                               <a
                                 href={`https://instagram.com/${user.instagram}`}
                                 target="_blank"
@@ -654,7 +704,7 @@ export default function AdminDashboard() {
                             </td>
 
                             {/* WhatsApp Link */}
-                            <td className="p-4">
+                            <td className="p-3 whitespace-nowrap">
                               <a
                                 href={`https://wa.me/${user.whatsapp.replace(/\+/g, "")}`}
                                 target="_blank"
@@ -670,68 +720,102 @@ export default function AdminDashboard() {
                             </td>
 
                             {/* Email */}
-                            <td className="p-4">{user.email}</td>
+                            <td className="p-3 truncate max-w-[140px]" title={user.email}>
+                              {user.email}
+                            </td>
+
+                            {/* DNI */}
+                            <td className="p-3 font-semibold text-white/90 whitespace-nowrap">
+                              {user.dni || "-"}
+                            </td>
 
                             {/* Fecha de Nacimiento */}
-                            <td className="p-4 text-center">{user.dob}</td>
+                            <td className="p-3 text-center whitespace-nowrap">{user.dob}</td>
 
                             {/* Ubicación */}
-                            <td className="p-4">{user.location}</td>
+                            <td className="p-3 whitespace-nowrap">{user.location}</td>
 
                             {/* Cómo nos conoció */}
-                            <td className="p-4 text-xs">{user.referral}</td>
+                            <td className="p-3 max-w-[100px] truncate" title={user.referral}>
+                              {user.referral}
+                            </td>
 
                             {/* Estado (Pendiente, Vino, No vino) */}
-                            <td className="p-4 text-center">
+                            <td className="p-3 text-center whitespace-nowrap">
                               {!user.emailSent ? (
-                                <span className="bg-white/5 text-white/40 border border-white/10 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                <span className="bg-white/5 text-white/40 border border-white/10 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                   Pendiente
                                 </span>
                               ) : user.attended ? (
-                                <span className="bg-green-500/10 text-green-400 border border-green-500/20 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                <span className="bg-green-500/10 text-green-400 border border-green-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                   Vino
                                 </span>
                               ) : (
-                                <span className="bg-white/5 text-white/30 border border-white/10 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                <span className="bg-white/5 text-white/30 border border-white/10 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                   No Vino
                                 </span>
                               )}
                             </td>
 
                             {/* Acciones */}
-                            <td className="p-4 text-right">
-                              <div className="flex flex-col items-end gap-1">
-                                <button
-                                  onClick={() => handleSendEmail(user)}
-                                  disabled={status === "sending"}
-                                  className={`flex items-center gap-1.5 ${
-                                    user.emailSent
-                                      ? "bg-white/10 hover:bg-white/20 text-white/60 border border-white/10"
-                                      : "bg-spotify-accent hover:opacity-90 text-white"
-                                  } disabled:opacity-50 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95`}
-                                >
-                                  {status === "sending" ? (
-                                    <Loader2
-                                      className="animate-spin"
-                                      size={12}
-                                    />
-                                  ) : (
-                                    <Mail size={12} />
-                                  )}
-                                  {user.emailSent
-                                    ? "Reenviar Mail"
-                                    : "Enviar Mail"}
-                                </button>
+                            <td className="p-3 pr-4 text-center whitespace-nowrap">
+                              <div className="flex flex-col items-center justify-center gap-1 min-w-[100px]">
+                                {!user.dni ? (
+                                  <button
+                                    onClick={() => {
+                                      setDniTargetUser(user);
+                                      setDniInput("");
+                                      setIsDniModalOpen(true);
+                                    }}
+                                    className="bg-spotify-accent hover:opacity-90 active:scale-95 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all"
+                                  >
+                                    Cargar DNI
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleSendEmail(user)}
+                                      disabled={status === "sending"}
+                                      className={`flex items-center justify-center gap-1 w-full ${
+                                        user.emailSent
+                                          ? "bg-white/10 hover:bg-white/20 text-white/60 border border-white/10"
+                                          : "bg-spotify-accent hover:opacity-90 text-white"
+                                      } disabled:opacity-50 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95`}
+                                    >
+                                      {status === "sending" ? (
+                                        <Loader2
+                                          className="animate-spin"
+                                          size={10}
+                                        />
+                                      ) : (
+                                        <Mail size={10} />
+                                      )}
+                                      {user.emailSent
+                                        ? "Reenviar"
+                                        : "Enviar Mail"}
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setDniTargetUser(user);
+                                        setDniInput(user.dni || "");
+                                        setIsDniModalOpen(true);
+                                      }}
+                                      className="text-[9px] text-spotify-text-secondary hover:text-white transition-colors underline"
+                                    >
+                                      Editar DNI
+                                    </button>
+                                  </>
+                                )}
 
                                 {user.emailSent && status === "idle" && (
-                                  <span className="text-[10px] text-green-400 font-medium">
-                                    Enviado anteriormente
+                                  <span className="text-[9px] text-green-400 font-medium">
+                                    Enviado
                                   </span>
                                 )}
 
                                 {statusMsg && (
                                   <span
-                                    className={`text-[10px] mt-1 font-medium ${
+                                    className={`text-[9px] mt-0.5 font-medium ${
                                       status === "success"
                                         ? "text-green-400"
                                         : status === "error"
@@ -798,7 +882,7 @@ export default function AdminDashboard() {
                             )}
                           </div>
                         </div>
-
+ 
                         {/* Detalles de contacto */}
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-spotify-text-near bg-black/10 p-3 rounded-lg">
                           <div>
@@ -822,34 +906,71 @@ export default function AdminDashboard() {
                               {user.email}
                             </span>
                           </div>
-                          <div className="col-span-2 mt-1">
-                            <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
-                              Referencia
-                            </span>
-                            <p className="italic text-spotify-text-secondary">
-                              "{user.referral}"
-                            </p>
+                          <div className="col-span-2 border-t border-white/5 pt-2 mt-1">
+                            <div className="flex justify-between items-start gap-4">
+                              <div>
+                                <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
+                                  DNI
+                                </span>
+                                <span className="font-semibold text-white">
+                                  {user.dni || "No cargado"}
+                                </span>
+                              </div>
+                              <div className="min-w-0">
+                                <span className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-0.5">
+                                  Referencia
+                                </span>
+                                <p className="italic text-spotify-text-secondary truncate">
+                                  "{user.referral}"
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </div>
-
+ 
                         {/* Botón de acción */}
                         <div className="flex flex-col gap-2 pt-1">
-                          <button
-                            onClick={() => handleSendEmail(user)}
-                            disabled={status === "sending"}
-                            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95 ${
-                              user.emailSent
-                                ? "bg-white/10 hover:bg-white/20 text-white/70 border border-white/10"
-                                : "bg-spotify-accent hover:opacity-90 text-white"
-                            }`}
-                          >
-                            {status === "sending" ? (
-                              <Loader2 className="animate-spin" size={14} />
-                            ) : (
-                              <Mail size={14} />
-                            )}
-                            {user.emailSent ? "Reenviar Mail" : "Enviar Mail"}
-                          </button>
+                          {!user.dni ? (
+                            <button
+                              onClick={() => {
+                                setDniTargetUser(user);
+                                setDniInput("");
+                                setIsDniModalOpen(true);
+                              }}
+                              className="w-full flex items-center justify-center gap-2 bg-spotify-accent hover:opacity-90 active:scale-95 text-white py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all"
+                            >
+                              Cargar DNI
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleSendEmail(user)}
+                                disabled={status === "sending"}
+                                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95 ${
+                                  user.emailSent
+                                    ? "bg-white/10 hover:bg-white/20 text-white/70 border border-white/10"
+                                    : "bg-spotify-accent hover:opacity-90 text-white"
+                                }`}
+                              >
+                                {status === "sending" ? (
+                                  <Loader2 className="animate-spin" size={14} />
+                                ) : (
+                                  <Mail size={14} />
+                                )}
+                                {user.emailSent ? "Reenviar Mail" : "Enviar Mail"}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setDniTargetUser(user);
+                                  setDniInput(user.dni || "");
+                                  setIsDniModalOpen(true);
+                                }}
+                                className="w-full text-center text-spotify-text-secondary hover:text-white transition-colors text-xs font-bold uppercase tracking-wider py-1"
+                              >
+                                Editar DNI
+                              </button>
+                            </>
+                          )}
 
                           {statusMsg && (
                             <span
@@ -871,12 +992,12 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Paginación */}
-                {filteredList.length > 0 && (
+                {totalItems > 0 && (
                   <div className="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 border-t border-white/5 bg-black/10 text-sm">
                     <span className="text-spotify-text-secondary text-xs">
                       Mostrando {startIndex + 1} -{" "}
-                      {Math.min(startIndex + itemsPerPage, filteredList.length)}{" "}
-                      de {filteredList.length} registros
+                      {Math.min(startIndex + itemsPerPage, totalItems)}{" "}
+                      de {totalItems} registros
                     </span>
                     <div className="flex items-center gap-4 flex-wrap">
                       <div className="flex items-center gap-1.5 text-xs text-spotify-text-secondary font-bold">
@@ -1132,6 +1253,70 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Carga/Edición de DNI */}
+      {isDniModalOpen && dniTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-spotify-surface border border-white/10 max-w-sm w-full rounded-2xl p-6 spotify-shadow-heavy">
+            <div className="flex flex-col items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-spotify-accent/10 border border-spotify-accent/20 rounded-full flex items-center justify-center text-spotify-accent">
+                <User size={20} />
+              </div>
+              <h2 className="text-lg font-bold text-white text-center">
+                📋 Cargar DNI del Invitado
+              </h2>
+              <p className="text-spotify-text-secondary text-xs text-center">
+                Ingresá el número de documento para @{dniTargetUser.instagram}
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveDni} className="space-y-4">
+              <div>
+                <label className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-1.5 pl-1">
+                  Número de DNI
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: 42098123"
+                  value={dniInput}
+                  onChange={(e) => setDniInput(e.target.value)}
+                  className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full px-4 py-2.5 text-xs text-white placeholder-spotify-text-secondary focus:outline-none transition-colors"
+                />
+              </div>
+
+              {dniError && (
+                <div className="text-[11px] text-spotify-error bg-spotify-error/10 border border-spotify-error/20 p-2.5 rounded-lg font-medium text-center">
+                  {dniError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDniModalOpen(false);
+                    setDniTargetUser(null);
+                    setDniInput("");
+                  }}
+                  disabled={isDniSaving}
+                  className="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isDniSaving}
+                  className="bg-spotify-accent hover:opacity-90 active:scale-95 text-white px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDniSaving && <Loader2 className="animate-spin" size={12} />}
+                  Guardar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

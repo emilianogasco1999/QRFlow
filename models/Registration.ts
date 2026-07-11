@@ -10,6 +10,7 @@ export interface IRegistration extends Document {
   qrToken: string;
   emailSent: boolean;
   attended: boolean;
+  dni?: string;
   createdAt: Date;
 }
 
@@ -57,6 +58,10 @@ const RegistrationSchema: Schema = new Schema({
   attended: {
     type: Boolean,
     default: false,
+  },
+  dni: {
+    type: String,
+    trim: true,
   },
   createdAt: {
     type: Date,
