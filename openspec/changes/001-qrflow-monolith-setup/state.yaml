@@ -1,0 +1,11 @@
+phase: apply
+status: success
+change: 001-qrflow-monolith-setup
+phases:
+  proposal: success
+  specs: success
+  design: success
+  tasks: success
+  apply: success
+  verify: pending
+  archive: pending
