@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Check, ChevronDown } from "lucide-react";
 import paises from "@/app/api/data/paises.json";
@@ -11,6 +11,19 @@ export default function UserForm() {
   const [apiError, setApiError] = useState("");
   const [qrToken, setQrToken] = useState("");
   const [dialCode, setDialCode] = useState("+54"); // AR por defecto
+  const [isDialOpen, setIsDialOpen] = useState(false);
+  const dialRef = useRef<HTMLDivElement>(null);
+
+  // Cierra el dropdown de código de país al hacer click fuera
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dialRef.current && !dialRef.current.contains(e.target as Node)) {
+        setIsDialOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -237,28 +250,53 @@ export default function UserForm() {
                   <label className="block text-white/80 text-xs font-semibold   mb-1.5 pl-0.5">
                     Tu whatsapp — acá te enviamos la invitación
                   </label>
-                  <div className="flex bg-black/15 rounded-xl border border-[#f2e5d7]/10 focus-within:border-[#f2e5d7]/20 overflow-hidden transition-colors">
-                    {/* Selector de país */}
-                    <div className="relative flex-shrink-0">
-                      <select
-                        value={dialCode}
-                        onChange={(e) => setDialCode(e.target.value)}
-                        className="h-full appearance-none text-white/90 text-xs font-bold pl-3 pr-7 py-3.5 border-r border-[#f2e5d7]/10 outline-none cursor-pointer hover:text-white transition-colors bg-transparent"
+                  <div className="flex bg-black/15 rounded-xl border border-[#f2e5d7]/10 focus-within:border-[#f2e5d7]/20 transition-colors">
+                    {/* Custom selector de país */}
+                    <div ref={dialRef} className="relative flex-shrink-0">
+                      {/* Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => setIsDialOpen((o) => !o)}
+                        className="h-full flex items-center gap-1.5 pl-3 pr-7 py-3.5 border-r border-[#f2e5d7]/10 text-white/90 text-xs font-bold cursor-pointer hover:text-white transition-colors whitespace-nowrap"
                       >
-                        {paises.map((p) => (
-                          <option
-                            key={p.code}
-                            value={p.dial_code}
-                            style={{ background: "#1e1d38", color: "#fff" }}
-                          >
-                            {p.code} {p.dial_code} — {p.name}
-                          </option>
-                        ))}
-                      </select>
+                        {(() => {
+                          const p = paises.find(
+                            (p) => p.dial_code === dialCode,
+                          );
+                          return p ? `${p.code} ${p.dial_code}` : dialCode;
+                        })()}
+                      </button>
                       <ChevronDown
                         size={12}
-                        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white/40"
+                        className={`pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white/40 transition-transform ${
+                          isDialOpen ? "rotate-180" : ""
+                        }`}
                       />
+                      {/* Dropdown list */}
+                      {isDialOpen && (
+                        <div
+                          className="absolute left-0 top-full mt-1 z-50 w-56 max-h-60 overflow-y-auto rounded-xl border border-[#f2e5d7]/10 shadow-2xl"
+                          style={{ background: "#1a1930" }}
+                        >
+                          {paises.map((p) => (
+                            <button
+                              key={p.code}
+                              type="button"
+                              onClick={() => {
+                                setDialCode(p.dial_code);
+                                setIsDialOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-white/10 ${
+                                dialCode === p.dial_code
+                                  ? "text-white font-bold bg-white/5"
+                                  : "text-white/70"
+                              }`}
+                            >
+                              {p.code} {p.dial_code} — {p.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <input
                       type="tel"
@@ -332,7 +370,7 @@ export default function UserForm() {
                       onChange={(e) =>
                         handleInputChange("location", e.target.value)
                       }
-                      className="w-full text-white border border-[#f2e5d7]/10 focus:border-[#f2e5d7]/20 rounded-xl p-3.5 outline-none text-sm appearance-none cursor-pointer transition-colors bg-transparent"
+                      className="w-full text-white border border-[#f2e5d7]/10 focus:border-[#f2e5d7]/20 rounded-xl p-3.5 outline-none text-sm appearance-none cursor-pointer transition-colors bg-black/15"
                       // style={{ background: "#1e1d38", color: "#fff" }}
                     >
                       <option
@@ -486,7 +524,7 @@ export default function UserForm() {
                       onChange={(e) =>
                         handleInputChange("referral", e.target.value)
                       }
-                      className="w-full text-white border border-[#f2e5d7]/10 focus:border-[#f2e5d7]/20 rounded-xl p-3.5 outline-none text-sm appearance-none cursor-pointer transition-colors bg-transparent"
+                      className="w-full text-white border border-[#f2e5d7]/10 focus:border-[#f2e5d7]/20 rounded-xl p-3.5 outline-none text-sm appearance-none cursor-pointer transition-colors bg-black/15"
                       // style={{ background: "#1e1d38", color: "#fff" }}
                     >
                       <option

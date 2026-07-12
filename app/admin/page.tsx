@@ -519,7 +519,7 @@ export default function AdminDashboard() {
               <Lock size={20} />
             </div>
             <h1 className="text-xl font-bold tracking-tight text-center">
-              QRFlow Admin
+              Local Social Club Admin
             </h1>
             <p className="text-spotify-text-secondary text-xs text-center">
               Ingresá tus credenciales para acceder al panel.

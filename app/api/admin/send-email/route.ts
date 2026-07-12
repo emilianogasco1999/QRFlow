@@ -180,7 +180,7 @@ export async function POST(req: Request) {
           <div class="email-container">
             <div class="header">
               <h1>Te damos la bienvenida al club</h1>
-              <p class="subtitle">QRFLOW ACCESS CONTROL</p>
+              <p class="subtitle">LOCAL SOCIAL CLUB ACCESS CONTROL</p>
             </div>
             <div class="content">
               <p class="salutation">Hola @${user.fullName}</p>
@@ -210,7 +210,7 @@ export async function POST(req: Request) {
                 Este correo es automático. No responder este mail
               </div>
               <div class="brand">
-                QRFlow &copy; 2026
+                Local Social Club &copy; 2026
               </div>
             </div>
           </div>
@@ -248,7 +248,7 @@ export async function POST(req: Request) {
     // Enviar usando Resend (onboarding@resend.dev por defecto de test en Resend)
     const resend = new Resend(resendApiKey);
     await resend.emails.send({
-      from: "QRFlow <onboarding@resend.dev>",
+      from: "Local Social Club <onboarding@resend.dev>",
       to: [user.email],
       subject: "Tu invitación con código QR - Bienvenido al Club",
       html: emailHtml,
