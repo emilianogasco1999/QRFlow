@@ -2,13 +2,15 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, ChevronDown } from "lucide-react";
+import paises from "@/app/api/data/paises.json";
 
 export default function UserForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState("");
   const [qrToken, setQrToken] = useState("");
+  const [dialCode, setDialCode] = useState("+54"); // AR por defecto
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -115,7 +117,7 @@ export default function UserForm() {
         body: JSON.stringify({
           fullName: formData.fullName.trim(),
           instagram: formData.instagram.replace(/^@/, "").trim(),
-          whatsapp: "+54" + formData.whatsapp.replace(/\D/g, ""), // Prefijo AR y número limpio
+          whatsapp: dialCode + formData.whatsapp.replace(/\D/g, ""), // Prefijo seleccionado + número limpio
           email: formData.email.trim(),
           dob: formData.dob,
           location: formData.location,
@@ -236,8 +238,27 @@ export default function UserForm() {
                     Tu whatsapp — acá te enviamos la invitación
                   </label>
                   <div className="flex bg-black/15 rounded-xl border border-[#f2e5d7]/10 focus-within:border-[#f2e5d7]/20 overflow-hidden transition-colors">
-                    <div className="flex items-center justify-center px-4 border-r border-[#f2e5d7]/10 text-white/50 text-xs font-bold select-none">
-                      AR +54
+                    {/* Selector de país */}
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={dialCode}
+                        onChange={(e) => setDialCode(e.target.value)}
+                        className="h-full appearance-none text-white/90 text-xs font-bold pl-3 pr-7 py-3.5 border-r border-[#f2e5d7]/10 outline-none cursor-pointer hover:text-white transition-colors bg-transparent"
+                      >
+                        {paises.map((p) => (
+                          <option
+                            key={p.code}
+                            value={p.dial_code}
+                            style={{ background: "#1e1d38", color: "#fff" }}
+                          >
+                            {p.code} {p.dial_code} — {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        size={12}
+                        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white/40"
+                      />
                     </div>
                     <input
                       type="tel"
@@ -311,16 +332,139 @@ export default function UserForm() {
                       onChange={(e) =>
                         handleInputChange("location", e.target.value)
                       }
-                      className="w-full bg-black/15 text-white border border-[#f2e5d7]/10 focus:border-[#f2e5d7]/20 rounded-xl p-3.5 outline-none text-sm appearance-none cursor-pointer transition-colors"
+                      className="w-full text-white border border-[#f2e5d7]/10 focus:border-[#f2e5d7]/20 rounded-xl p-3.5 outline-none text-sm appearance-none cursor-pointer transition-colors bg-transparent"
+                      // style={{ background: "#1e1d38", color: "#fff" }}
                     >
-                      <option value="" disabled>
+                      <option
+                        value=""
+                        disabled
+                        style={{ background: "#1e1d38" }}
+                      >
                         seleccionar
                       </option>
-                      <option value="Buenos Aires">Buenos Aires</option>
-                      <option value="Córdoba">Córdoba</option>
-                      <option value="Santa Fe">Santa Fe</option>
-                      <option value="Mendoza">Mendoza</option>
-                      <option value="Otra provincia">Otra provincia</option>
+                      <option
+                        value="Ciudad Autónoma de Buenos Aires"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Ciudad Autónoma de Buenos Aires
+                      </option>
+                      <option
+                        value="Buenos Aires"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Buenos Aires
+                      </option>
+                      <option
+                        value="Catamarca"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Catamarca
+                      </option>
+                      <option value="Chaco" style={{ background: "#1e1d38" }}>
+                        Chaco
+                      </option>
+                      <option value="Chubut" style={{ background: "#1e1d38" }}>
+                        Chubut
+                      </option>
+                      <option value="Córdoba" style={{ background: "#1e1d38" }}>
+                        Córdoba
+                      </option>
+                      <option
+                        value="Corrientes"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Corrientes
+                      </option>
+                      <option
+                        value="Entre Ríos"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Entre Ríos
+                      </option>
+                      <option value="Formosa" style={{ background: "#1e1d38" }}>
+                        Formosa
+                      </option>
+                      <option value="Jujuy" style={{ background: "#1e1d38" }}>
+                        Jujuy
+                      </option>
+                      <option
+                        value="La Pampa"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        La Pampa
+                      </option>
+                      <option
+                        value="La Rioja"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        La Rioja
+                      </option>
+                      <option value="Mendoza" style={{ background: "#1e1d38" }}>
+                        Mendoza
+                      </option>
+                      <option
+                        value="Misiones"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Misiones
+                      </option>
+                      <option value="Neuquén" style={{ background: "#1e1d38" }}>
+                        Neuquén
+                      </option>
+                      <option
+                        value="Río Negro"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Río Negro
+                      </option>
+                      <option value="Salta" style={{ background: "#1e1d38" }}>
+                        Salta
+                      </option>
+                      <option
+                        value="San Juan"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        San Juan
+                      </option>
+                      <option
+                        value="San Luis"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        San Luis
+                      </option>
+                      <option
+                        value="Santa Cruz"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Santa Cruz
+                      </option>
+                      <option
+                        value="Santa Fe"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Santa Fe
+                      </option>
+                      <option
+                        value="Santiago del Estero"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Santiago del Estero
+                      </option>
+                      <option
+                        value="Tierra del Fuego, Antártida e Islas del Atlántico Sur"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Tierra del Fuego, Antártida e Islas del Atlántico Sur
+                      </option>
+                      <option value="Tucumán" style={{ background: "#1e1d38" }}>
+                        Tucumán
+                      </option>
+                      <option
+                        value="Otro Pais"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Otro País
+                      </option>
                     </select>
                   </div>
                   {validationErrors.location && (
@@ -342,15 +486,34 @@ export default function UserForm() {
                       onChange={(e) =>
                         handleInputChange("referral", e.target.value)
                       }
-                      className="w-full bg-black/15 text-white border border-[#f2e5d7]/10 focus:border-[#f2e5d7]/20 rounded-xl p-3.5 outline-none text-sm appearance-none cursor-pointer transition-colors"
+                      className="w-full text-white border border-[#f2e5d7]/10 focus:border-[#f2e5d7]/20 rounded-xl p-3.5 outline-none text-sm appearance-none cursor-pointer transition-colors bg-transparent"
+                      // style={{ background: "#1e1d38", color: "#fff" }}
                     >
-                      <option value="" disabled>
+                      <option
+                        value=""
+                        disabled
+                        style={{ background: "#1e1d38" }}
+                      >
                         seleccionar opción
                       </option>
-                      <option value="Instagram">Instagram</option>
-                      <option value="Un amigo">Un amigo</option>
-                      <option value="Tiktok">Tiktok</option>
-                      <option value="Otro">Otro</option>
+                      <option
+                        value="Instagram"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Instagram
+                      </option>
+                      <option
+                        value="Un amigo"
+                        style={{ background: "#1e1d38" }}
+                      >
+                        Un amigo
+                      </option>
+                      <option value="Tiktok" style={{ background: "#1e1d38" }}>
+                        Tiktok
+                      </option>
+                      <option value="Otro" style={{ background: "#1e1d38" }}>
+                        Otro
+                      </option>
                     </select>
                   </div>
                   {validationErrors.referral && (
