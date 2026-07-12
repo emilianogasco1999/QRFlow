@@ -489,10 +489,10 @@ export default function UserForm() {
                         Santiago del Estero
                       </option>
                       <option
-                        value="Tierra del Fuego, Antártida e Islas del Atlántico Sur"
+                        value="Tierra del Fuego"
                         style={{ background: "#1e1d38" }}
                       >
-                        Tierra del Fuego, Antártida e Islas del Atlántico Sur
+                        Tierra del Fuego
                       </option>
                       <option value="Tucumán" style={{ background: "#1e1d38" }}>
                         Tucumán
