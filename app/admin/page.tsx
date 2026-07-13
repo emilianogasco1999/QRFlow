@@ -16,6 +16,7 @@ import {
   Lock,
   User,
   LogOut,
+  Calendar,
 } from "lucide-react";
 
 interface RegistrationItem {
@@ -90,6 +91,13 @@ export default function AdminDashboard() {
   const [dniInput, setDniInput] = useState("");
   const [isDniSaving, setIsDniSaving] = useState(false);
   const [dniError, setDniError] = useState("");
+
+  // Estados para Configuración de Fecha y Hora del Evento
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [eventDate, setEventDate] = useState("");
+  const [eventTime, setEventTime] = useState("");
+  const [isConfigSaving, setIsConfigSaving] = useState(false);
+  const [configError, setConfigError] = useState("");
 
   // Estados para Carga de Pago
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -170,6 +178,34 @@ export default function AdminDashboard() {
     };
     checkAuthStatus();
   }, []);
+
+  const getFormattedDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  const fetchEventConfig = async () => {
+    try {
+      const res = await fetch("/api/admin/event-config");
+      const data = await res.json();
+      if (res.ok && data.success && data.config) {
+        setEventDate(data.config.date || "");
+        setEventTime(data.config.time || "");
+      }
+    } catch (err) {
+      console.error("Error al obtener la configuración del evento:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchEventConfig();
+    }
+  }, [isAuthenticated]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,6 +317,33 @@ export default function AdminDashboard() {
       setDniError(err.message);
     } finally {
       setIsDniSaving(false);
+    }
+  };
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsConfigSaving(true);
+    setConfigError("");
+    try {
+      const res = await fetch("/api/admin/event-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: eventDate,
+          time: eventTime,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.error || "Error al guardar la configuración del evento.",
+        );
+      }
+      setIsConfigModalOpen(false);
+    } catch (err: any) {
+      setConfigError(err.message);
+    } finally {
+      setIsConfigSaving(false);
     }
   };
 
@@ -600,26 +663,45 @@ export default function AdminDashboard() {
             <p className="text-spotify-text-secondary text-sm">
               Lista de solicitudes completadas y control de accesos QR.
             </p>
+            {(eventDate || eventTime) && (
+              <p className="text-spotify-text-primary text-xs font-bold mt-2.5 flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full w-fit">
+                <Calendar
+                  size={13}
+                  className="text-spotify-text-primary flex-shrink-0"
+                />
+                <span>
+                  Evento: {eventDate ? getFormattedDate(eventDate) : "-"}{" "}
+                  {eventTime ? `a las ${eventTime} hs` : ""}
+                </span>
+              </p>
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+            <button
+              onClick={() => setIsConfigModalOpen(true)}
+              className="flex items-center justify-center gap-2 bg-spotify-button hover:bg-spotify-card border border-white/10 px-4 py-2.5 sm:py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors w-full sm:w-auto whitespace-nowrap"
+            >
+              <Calendar size={14} className="flex-shrink-0" />
+              actualizar fecha y hora
+            </button>
             <button
               onClick={fetchData}
               disabled={loading}
-              className="flex items-center gap-2 bg-spotify-button hover:bg-spotify-card border border-white/10 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+              className="flex items-center justify-center gap-2 bg-spotify-button hover:bg-spotify-card border border-white/10 px-4 py-2.5 sm:py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 w-full sm:w-auto whitespace-nowrap"
             >
               {loading ? (
-                <Loader2 className="animate-spin" size={14} />
+                <Loader2 className="animate-spin flex-shrink-0" size={14} />
               ) : (
-                <RefreshCw size={14} />
+                <RefreshCw size={14} className="flex-shrink-0" />
               )}
               actualizar lista
             </button>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 hover:border-red-500/50 text-red-400 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors"
+              className="flex items-center justify-center gap-2 bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 hover:border-red-500/50 text-red-400 px-4 py-2.5 sm:py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors w-full sm:w-auto whitespace-nowrap"
             >
-              <LogOut size={14} />
+              <LogOut size={14} className="flex-shrink-0" />
               Cerrar Sesión
             </button>
           </div>
@@ -1578,6 +1660,82 @@ export default function AdminDashboard() {
                   className="w-full text-center text-spotify-text-secondary hover:text-white transition-colors text-xs font-bold uppercase tracking-wider py-1.5 mt-1"
                 >
                   Cancelar / Cerrar Sesión
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para Configuración de Fecha y Hora del Evento */}
+      {isConfigModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-spotify-surface border border-white/10 max-w-sm w-full rounded-2xl p-6 spotify-shadow-heavy">
+            <div className="flex flex-col items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-spotify-accent/10 border border-spotify-accent/20 rounded-full flex items-center justify-center text-spotify-accent">
+                <Calendar size={20} />
+              </div>
+              <h2 className="text-lg font-bold text-white text-center">
+                📅 Configurar Fecha y Hora
+              </h2>
+              <p className="text-spotify-text-secondary text-xs text-center">
+                Establecé la fecha y hora del evento para incluir en los correos
+                de invitación.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveConfig} className="space-y-4">
+              <div>
+                <label className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-1.5 pl-1">
+                  Fecha del Evento
+                </label>
+                <input
+                  type="date"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                  className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full px-4 py-2.5 text-xs text-white focus:outline-none transition-colors [color-scheme:dark]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-1.5 pl-1">
+                  Hora del Evento
+                </label>
+                <input
+                  type="time"
+                  value={eventTime}
+                  onChange={(e) => setEventTime(e.target.value)}
+                  className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full px-4 py-2.5 text-xs text-white focus:outline-none transition-colors [color-scheme:dark]"
+                />
+              </div>
+
+              {configError && (
+                <div className="text-[11px] text-spotify-error bg-spotify-error/10 border border-spotify-error/20 p-2.5 rounded-lg font-medium text-center">
+                  {configError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsConfigModalOpen(false);
+                    setConfigError("");
+                  }}
+                  disabled={isConfigSaving}
+                  className="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isConfigSaving}
+                  className="bg-spotify-accent hover:opacity-90 active:scale-95 text-white px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isConfigSaving && (
+                    <Loader2 className="animate-spin" size={12} />
+                  )}
+                  Guardar
                 </button>
               </div>
             </form>

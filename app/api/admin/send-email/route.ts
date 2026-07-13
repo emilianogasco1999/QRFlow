@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import Registration from "@/models/Registration";
+import EventConfig from "@/models/EventConfig";
 import { Resend } from "resend";
 import fs from "fs";
 import path from "path";
@@ -38,6 +39,17 @@ export async function POST(req: Request) {
         { success: false, error: "Registro no encontrado" },
         { status: 404 },
       );
+    }
+
+    const eventConfig = await EventConfig.findOne();
+    let formattedDate = "-";
+    if (eventConfig?.date) {
+      const parts = eventConfig.date.split("-");
+      if (parts.length === 3) {
+        formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      } else {
+        formattedDate = eventConfig.date;
+      }
     }
 
     // Usar API de QRServer para renderizar el QR en tiempo real desde el mail
@@ -183,7 +195,7 @@ export async function POST(req: Request) {
               <p class="subtitle">LOCAL SOCIAL CLUB ACCESS CONTROL</p>
             </div>
             <div class="content">
-              <p class="salutation">Hola @${user.fullName}</p>
+              <p class="salutation">Hola ${user.fullName}</p>
               <p>Tu solicitud de acceso ha sido aprobada. Presentá este código QR único al ingresar al evento. Recordá que tu entrada es personal e intransferible.</p>
               <div class="qr-container">
                 <div class="qr-wrapper">
@@ -200,8 +212,12 @@ export async function POST(req: Request) {
                   <span class="detail-value">${user.dni}</span>
                 </div>
                 <div class="detail-row">
-                  <span class="detail-label">WhatsApp:</span>
-                  <span class="detail-value">${user.whatsapp}</span>
+                  <span class="detail-label">Fecha:</span>
+                  <span class="detail-value">${formattedDate}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Hora:</span>
+                  <span class="detail-value">${eventConfig?.time || "-"}</span>
                 </div>
               </div>
             </div>
@@ -277,9 +293,9 @@ export async function POST(req: Request) {
           {
             success: false,
             error: "Error de Resend: " + error.message,
-            details: error
+            details: error,
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -309,8 +325,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       mocked: true,
-      message:
-        "Email simulado guardado localmente en scratch/last-email.html",
+      message: "Email simulado guardado localmente en scratch/last-email.html",
     });
   } catch (error: any) {
     console.error("Error en /api/admin/send-email:", error);
