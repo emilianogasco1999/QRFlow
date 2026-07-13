@@ -219,53 +219,99 @@ export async function POST(req: Request) {
     `;
 
     const resendApiKey = process.env.RESEND_API_KEY;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
 
-    if (!resendApiKey || resendApiKey === "YOUR_RESEND_API_KEY") {
-      // MOCK FALLBACK: Guardar el mail en un archivo local para testing sin requerir API key
-      const scratchDir = path.join(process.cwd(), "scratch");
-      if (!fs.existsSync(scratchDir)) {
-        fs.mkdirSync(scratchDir);
-      }
-      // Reemplazar cid por url real para que se previsualice en el navegador local
-      const previewHtml = emailHtml.replace("cid:qr-code", qrUrl);
-      fs.writeFileSync(path.join(scratchDir, "last-email.html"), previewHtml);
+    // 1. Si está configurado SMTP (Gmail), usamos Nodemailer para enviar a cualquier persona sin dominio
+    if (smtpUser && smtpPass) {
+      const nodemailer = (await import("nodemailer")).default;
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"Local Social Club" <${smtpUser}>`,
+        to: user.email,
+        subject: "Tu invitación con código QR - Bienvenido al Club",
+        html: emailHtml,
+        attachments: [
+          {
+            filename: "qr.png",
+            path: qrUrl,
+            cid: "qr-code", // coincide con src="cid:qr-code" en el HTML
+          },
+        ],
+      });
 
       // Actualizar estado en base de datos
       user.emailSent = true;
       await user.save();
 
-      console.log(
-        "RESEND_API_KEY no configurada. Email simulado guardado en scratch/last-email.html",
-      );
-      return NextResponse.json({
-        success: true,
-        mocked: true,
-        message:
-          "Email simulado guardado localmente en scratch/last-email.html",
-      });
+      return NextResponse.json({ success: true, method: "smtp" });
     }
 
-    // Enviar usando Resend (onboarding@resend.dev por defecto de test en Resend)
-    const resend = new Resend(resendApiKey);
-    await resend.emails.send({
-      from: "Local Social Club <onboarding@resend.dev>",
-      to: [user.email],
-      subject: "Tu invitación con código QR - Bienvenido al Club",
-      html: emailHtml,
-      attachments: [
-        {
-          path: qrUrl,
-          filename: "qr.png",
-          inlineContentId: "qr-code",
-        },
-      ],
-    });
+    // 2. Si no hay SMTP pero sí Resend API Key, usamos Resend
+    if (resendApiKey && resendApiKey !== "YOUR_RESEND_API_KEY") {
+      const resend = new Resend(resendApiKey);
+      const { data, error } = await resend.emails.send({
+        from: "Local Social Club <onboarding@resend.dev>",
+        to: [user.email],
+        subject: "Tu invitación con código QR - Bienvenido al Club",
+        html: emailHtml,
+        attachments: [
+          {
+            path: qrUrl,
+            filename: "qr.png",
+            inlineContentId: "qr-code",
+          },
+        ],
+      });
+
+      if (error) {
+        console.error("Error de la API de Resend:", error);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Error de Resend: " + error.message,
+            details: error
+          },
+          { status: 400 }
+        );
+      }
+
+      // Actualizar estado en base de datos
+      user.emailSent = true;
+      await user.save();
+
+      return NextResponse.json({ success: true, method: "resend", data });
+    }
+
+    // 3. MOCK FALLBACK: Guardar el mail en un archivo local para testing sin requerir credenciales
+    const scratchDir = path.join(process.cwd(), "scratch");
+    if (!fs.existsSync(scratchDir)) {
+      fs.mkdirSync(scratchDir);
+    }
+    // Reemplazar cid por url real para que se previsualice en el navegador local
+    const previewHtml = emailHtml.replace("cid:qr-code", qrUrl);
+    fs.writeFileSync(path.join(scratchDir, "last-email.html"), previewHtml);
 
     // Actualizar estado en base de datos
     user.emailSent = true;
     await user.save();
 
-    return NextResponse.json({ success: true });
+    console.log(
+      "Ni SMTP ni RESEND_API_KEY configuradas. Email simulado guardado en scratch/last-email.html",
+    );
+    return NextResponse.json({
+      success: true,
+      mocked: true,
+      message:
+        "Email simulado guardado localmente en scratch/last-email.html",
+    });
   } catch (error: any) {
     console.error("Error en /api/admin/send-email:", error);
     return NextResponse.json(
