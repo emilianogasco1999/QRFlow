@@ -768,7 +768,7 @@ export default function AdminDashboard() {
 
                           {/* Email */}
                           <td
-                            className="p-3 truncate max-w-[140px]"
+                            className="p-3 whitespace-nowrap"
                             title={user.email}
                           >
                             {user.email}
