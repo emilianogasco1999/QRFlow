@@ -78,7 +78,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: Request) {
   try {
     if (!(await isAuthorized())) {
       return NextResponse.json(
@@ -88,6 +88,24 @@ export async function DELETE() {
     }
 
     await dbConnect();
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (id) {
+      const result = await Registration.findByIdAndDelete(id);
+      if (!result) {
+        return NextResponse.json(
+          { success: false, error: "Registro no encontrado" },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        message: "Registro eliminado correctamente",
+      });
+    }
+
     const result = await Registration.deleteMany({});
     return NextResponse.json({
       success: true,

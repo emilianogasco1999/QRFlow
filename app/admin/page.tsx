@@ -50,6 +50,10 @@ export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSingleDeleteOpen, setIsSingleDeleteOpen] = useState(false);
+  const [singleDeleteTargetUser, setSingleDeleteTargetUser] =
+    useState<RegistrationItem | null>(null);
+  const [isSingleDeleting, setIsSingleDeleting] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Estados del Escáner y Asistencia
@@ -452,6 +456,35 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteSingle = async () => {
+    if (!singleDeleteTargetUser) return;
+    setIsSingleDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/admin/registrations?id=${singleDeleteTargetUser._id}`,
+        {
+          method: "DELETE",
+        },
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error al borrar el registro.");
+      }
+
+      setList((prevList) =>
+        prevList.filter((item) => item._id !== singleDeleteTargetUser._id),
+      );
+      setTotalItems((prev) => Math.max(0, prev - 1));
+      setIsSingleDeleteOpen(false);
+      setSingleDeleteTargetUser(null);
+      fetchData();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSingleDeleting(false);
+    }
+  };
+
   // Buscar usuario escaneado por su token
   const handleFetchScannedUser = async (token: string) => {
     setIsFetchScannedLoading(true);
@@ -697,6 +730,13 @@ export default function AdminDashboard() {
               )}
               actualizar lista
             </button>
+            {/* <button
+              onClick={() => setIsDeleteOpen(true)}
+              className="flex items-center justify-center gap-2 bg-red-950/20 hover:bg-red-900/30 border border-red-500/20 hover:border-red-500/40 text-red-400 px-4 py-2.5 sm:py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors w-full sm:w-auto whitespace-nowrap"
+            >
+              <Trash2 size={14} className="flex-shrink-0" />
+              Limpiar BD
+            </button> */}
             <button
               onClick={handleLogout}
               className="flex items-center justify-center gap-2 bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 hover:border-red-500/50 text-red-400 px-4 py-2.5 sm:py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors w-full sm:w-auto whitespace-nowrap"
@@ -986,6 +1026,18 @@ export default function AdminDashboard() {
                                   {statusMsg}
                                 </span>
                               )}
+
+                              <button
+                                onClick={() => {
+                                  setSingleDeleteTargetUser(user);
+                                  setIsSingleDeleteOpen(true);
+                                }}
+                                className="flex items-center justify-center gap-1 mt-1 text-red-400/80 hover:text-red-400 hover:bg-red-500/10 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all"
+                                title="Eliminar Registro"
+                              >
+                                <Trash2 size={10} />
+                                Eliminar
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1171,6 +1223,17 @@ export default function AdminDashboard() {
                             {statusMsg}
                           </span>
                         )}
+
+                        <button
+                          onClick={() => {
+                            setSingleDeleteTargetUser(user);
+                            setIsSingleDeleteOpen(true);
+                          }}
+                          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider text-red-400/80 hover:text-red-400 bg-red-950/20 hover:bg-red-950/40 border border-red-500/20 transition-all active:scale-95 mt-1"
+                        >
+                          <Trash2 size={13} />
+                          Eliminar Registro
+                        </button>
                       </div>
                     </div>
                   );
@@ -1272,6 +1335,53 @@ export default function AdminDashboard() {
                     <Trash2 size={12} />
                     Sí, borrar todo
                   </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Borrado de un único registro */}
+      {isSingleDeleteOpen && singleDeleteTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-spotify-surface border border-white/10 max-w-sm w-full rounded-2xl p-6 spotify-shadow-heavy">
+            <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <Trash2 size={18} className="text-red-500" />
+              ¿Borrar registro?
+            </h2>
+            <p className="text-spotify-text-secondary text-xs mb-6 leading-relaxed">
+              ¿Estás seguro de que querés eliminar permanentemente el registro
+              de{" "}
+              <strong className="text-white">
+                {singleDeleteTargetUser.fullName || "Sin Nombre"}
+              </strong>{" "}
+              (@{singleDeleteTargetUser.instagram})? Esta acción no se puede
+              deshacer.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setIsSingleDeleteOpen(false);
+                  setSingleDeleteTargetUser(null);
+                }}
+                disabled={isSingleDeleting}
+                className="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteSingle}
+                disabled={isSingleDeleting}
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+              >
+                {isSingleDeleting ? (
+                  <>
+                    <Loader2 className="animate-spin" size={12} />
+                    Borrando...
+                  </>
+                ) : (
+                  <>Sí, borrar</>
                 )}
               </button>
             </div>
