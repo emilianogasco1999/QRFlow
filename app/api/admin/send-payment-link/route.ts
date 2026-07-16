@@ -227,14 +227,6 @@ export async function POST(req: Request) {
                   <span class="detail-label">Monto:</span>
                   <span class="detail-value">$${result.unitPrice} ARS</span>
                 </div>
-                // <div class="detail-row">
-                //   <span class="detail-label">Fecha del Evento:</span>
-                //   <span class="detail-value">${formattedDate}</span>
-                // </div>
-                // <div class="detail-row">
-                //   <span class="detail-label">Hora:</span>
-                //   <span class="detail-value">${eventConfig?.time || "-"}</span>
-                // </div>
               </div>
             </div>
             <div class="footer">
