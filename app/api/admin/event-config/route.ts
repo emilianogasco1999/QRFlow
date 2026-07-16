@@ -25,7 +25,14 @@ export async function GET() {
     let config = await EventConfig.findOne();
     if (!config) {
       // Retorna valores vacíos por defecto si no existe
-      config = new EventConfig({ date: "", time: "", ticketPrice: 0, cardPrice: 0 });
+      config = new EventConfig({ 
+        date: "", 
+        time: "", 
+        ticketPrice: 0, 
+        cardPrice: 0,
+        location: "",
+        entryLimit: ""
+      });
     }
 
     return NextResponse.json({
@@ -52,13 +59,15 @@ export async function POST(req: Request) {
 
     await dbConnect();
     const body = await req.json();
-    const { date, time, ticketPrice, cardPrice } = body;
+    const { date, time, ticketPrice, cardPrice, location, entryLimit } = body;
 
     const updateFields: any = {};
     if (date !== undefined) updateFields.date = date;
     if (time !== undefined) updateFields.time = time;
     if (ticketPrice !== undefined) updateFields.ticketPrice = ticketPrice;
     if (cardPrice !== undefined) updateFields.cardPrice = cardPrice;
+    if (location !== undefined) updateFields.location = location;
+    if (entryLimit !== undefined) updateFields.entryLimit = entryLimit;
 
     const config = await EventConfig.findOneAndUpdate(
       {},

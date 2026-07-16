@@ -101,6 +101,8 @@ export default function AdminDashboard() {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
+  const [eventLocation, setEventLocation] = useState("");
+  const [entryLimit, setEntryLimit] = useState("");
   const [ticketPrice, setTicketPrice] = useState<number>(0);
   const [isConfigSaving, setIsConfigSaving] = useState(false);
   const [configError, setConfigError] = useState("");
@@ -120,6 +122,7 @@ export default function AdminDashboard() {
   const [isPaymentSaving, setIsPaymentSaving] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [isPaymentIdCopied, setIsPaymentIdCopied] = useState(false);
+  const [paymentProgressText, setPaymentProgressText] = useState("");
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetError, setResetError] = useState("");
@@ -213,6 +216,8 @@ export default function AdminDashboard() {
       if (res.ok && data.success && data.config) {
         setEventDate(data.config.date || "");
         setEventTime(data.config.time || "");
+        setEventLocation(data.config.location || "");
+        setEntryLimit(data.config.entryLimit || "");
         setTicketPrice(data.config.ticketPrice || 0);
       }
     } catch (err) {
@@ -350,6 +355,8 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           date: eventDate,
           time: eventTime,
+          location: eventLocation,
+          entryLimit,
           ticketPrice,
         }),
       });
@@ -371,7 +378,9 @@ export default function AdminDashboard() {
     if (!paymentTargetUser) return;
     setIsPaymentSaving(true);
     setPaymentError("");
+    setPaymentProgressText(paidValue ? "Registrando pago..." : "Cancelando pago...");
     try {
+      // 1. Guardar estado de pago en base de datos
       const res = await fetch("/api/admin/registrations", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -387,20 +396,46 @@ export default function AdminDashboard() {
         );
       }
 
+      let emailSentSuccess = paymentTargetUser.emailSent;
+
+      // 2. Si el pago es exitoso, enviamos automáticamente el correo de QR
+      if (paidValue) {
+        setPaymentProgressText("Enviando mail con código QR...");
+        try {
+          const emailRes = await fetch("/api/admin/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              registrationId: paymentTargetUser._id,
+            }),
+          });
+          const emailData = await emailRes.json();
+          if (emailRes.ok && emailData.success) {
+            emailSentSuccess = true;
+          } else {
+            console.warn("Error enviando email en la automatización de pago:", emailData.error);
+          }
+        } catch (emailErr) {
+          console.error("Fallo al enviar correo en la automatización de pago:", emailErr);
+        }
+      }
+
       setList((prevList) =>
         prevList.map((item) =>
           item._id === paymentTargetUser._id
-            ? { ...item, paid: data.user.paid }
+            ? { ...item, paid: data.user.paid, emailSent: emailSentSuccess }
             : item,
         ),
       );
 
       setIsPaymentModalOpen(false);
       setPaymentTargetUser(null);
+      setPaymentProgressText("");
     } catch (err: any) {
       setPaymentError(err.message);
     } finally {
       setIsPaymentSaving(false);
+      setPaymentProgressText("");
     }
   };
 
@@ -1943,6 +1978,13 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {isPaymentSaving && paymentProgressText && (
+              <div className="flex items-center justify-center gap-2 text-spotify-accent text-[11px] font-semibold text-center mb-4 animate-pulse">
+                <Loader2 className="animate-spin" size={12} />
+                {paymentProgressText}
+              </div>
+            )}
+
             <div className="flex flex-col gap-2.5">
               <div className="flex justify-between items-center gap-3">
                 <button
@@ -2110,6 +2152,32 @@ export default function AdminDashboard() {
                   value={eventTime}
                   onChange={(e) => setEventTime(e.target.value)}
                   className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full px-4 py-2.5 text-xs text-white focus:outline-none transition-colors [color-scheme:dark]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-1.5 pl-1">
+                  Lugar del Evento
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Av. del Golf 80, Tres Cerritos, Salta"
+                  value={eventLocation}
+                  onChange={(e) => setEventLocation(e.target.value)}
+                  className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full px-4 py-2.5 text-xs text-white focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-1.5 pl-1">
+                  Ingreso Hasta
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: las 02:00 am"
+                  value={entryLimit}
+                  onChange={(e) => setEntryLimit(e.target.value)}
+                  className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full px-4 py-2.5 text-xs text-white focus:outline-none transition-colors"
                 />
               </div>
 

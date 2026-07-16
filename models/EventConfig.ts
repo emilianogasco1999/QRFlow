@@ -5,6 +5,8 @@ export interface IEventConfig extends Document {
   time?: string;
   ticketPrice?: number;
   cardPrice?: number;
+  location?: string;
+  entryLimit?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +28,14 @@ const EventConfigSchema: Schema = new Schema(
     cardPrice: {
       type: Number,
       default: 0,
+    },
+    location: {
+      type: String,
+      default: "",
+    },
+    entryLimit: {
+      type: String,
+      default: "",
     },
   },
   {

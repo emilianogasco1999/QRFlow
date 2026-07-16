@@ -6,7 +6,9 @@ import EventConfig from "@/models/EventConfig";
 const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
 
 if (!accessToken) {
-  console.warn("WARNING: MERCADOPAGO_ACCESS_TOKEN no está definido en las variables de entorno.");
+  console.warn(
+    "WARNING: MERCADOPAGO_ACCESS_TOKEN no está definido en las variables de entorno.",
+  );
 }
 
 export const mercadopagoClient = new MercadoPagoConfig({
@@ -27,7 +29,7 @@ export interface PreferenceResult {
 export async function createPaymentPreference(
   registrationId: string,
   itemType: "ticket" | "card",
-  origin: string
+  origin: string,
 ): Promise<PreferenceResult> {
   // Asegurar conexión a base de datos
   await dbConnect();
@@ -49,14 +51,16 @@ export async function createPaymentPreference(
 
   if (itemType === "ticket") {
     unitPrice = config.ticketPrice || 0;
-    title = "Entrada Evento QRFlow";
+    title = "Friends Edition LSC";
   } else if (itemType === "card") {
     unitPrice = config.cardPrice || 0;
-    title = "Tarjeta Evento QRFlow";
+    title = "Friends Edition LSC";
   }
 
   if (unitPrice <= 0) {
-    throw new Error(`El precio para '${itemType}' no está configurado o es inválido.`);
+    throw new Error(
+      `El precio para '${itemType}' no está configurado o es inválido.`,
+    );
   }
 
   const formattedItems = [
@@ -70,7 +74,7 @@ export async function createPaymentPreference(
   ];
 
   const preference = new Preference(mercadopagoClient);
-  
+
   const defaultBackUrls = {
     success: `${origin}/checkout/success`,
     failure: `${origin}/checkout/failure`,

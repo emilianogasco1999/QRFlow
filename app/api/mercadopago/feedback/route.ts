@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import Registration from "@/models/Registration";
+import { sendQrEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
@@ -86,6 +87,15 @@ export async function POST(req: Request) {
     await registration.save();
 
     console.log(`[PAGO APROBADO] Registro ${registrationId} marcado como pagado con éxito.`);
+
+    // 5. Automatizar el envío de correo de invitación con código QR
+    try {
+      const emailResult = await sendQrEmail(registrationId);
+      console.log(`[EMAIL AUTOMÁTICO] Correo enviado tras confirmación de pago para ${registrationId}. Método: ${emailResult.method}`);
+    } catch (emailErr: any) {
+      console.error(`[EMAIL ERROR] Falló el envío del correo automático para ${registrationId}:`, emailErr);
+      // No retornamos error porque el pago ya fue confirmado con éxito en la base de datos
+    }
 
     return NextResponse.json({ success: true, paid: true });
   } catch (error: any) {
