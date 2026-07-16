@@ -27,11 +27,14 @@ export async function POST(req: Request) {
     // Crear la preferencia delegando en la función reutilizable
     const result = await createPaymentPreference(registrationId, itemType, origin);
 
+    // Decidir dinámicamente si usar Sandbox o Producción basándonos en el tipo de Access Token
+    const isProdToken = process.env.MERCADOPAGO_ACCESS_TOKEN?.startsWith("APP_USR-");
+    const paymentUrl = isProdToken ? result.initPoint : result.sandboxInitPoint;
+
     return NextResponse.json({
       success: true,
       preferenceId: result.preferenceId,
-      initPoint: result.initPoint,
-      sandboxInitPoint: result.sandboxInitPoint,
+      paymentUrl,
     });
   } catch (error: any) {
     console.error("Error al crear preferencia de Mercado Pago:", error);

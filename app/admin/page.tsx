@@ -513,8 +513,8 @@ export default function AdminDashboard() {
         );
       }
 
-      // En desarrollo usamos sandboxInitPoint, en producción initPoint
-      const paymentUrl = data.sandboxInitPoint || data.initPoint;
+      // La API resuelve dinámicamente si es Sandbox o Producción según el token configurado
+      const paymentUrl = data.paymentUrl;
 
       const message = encodeURIComponent(
         `¡Hola ${user.fullName}! Te dejamos el link para completar el pago de tu entrada: ${paymentUrl} una vez pagado, espera 5 segundos a que mercado pago te redirija a nuestra pagina para confirmar el pago o toca en el link que te proporcionan ellos`,
