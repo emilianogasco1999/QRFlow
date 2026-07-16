@@ -12,6 +12,7 @@ export interface IRegistration extends Document {
   emailSent: boolean;
   attended: boolean;
   paid: boolean;
+  paymentId?: string;
   dni?: string;
   createdAt: Date;
 }
@@ -69,6 +70,10 @@ const RegistrationSchema: Schema = new Schema({
   paid: {
     type: Boolean,
     default: false,
+  },
+  paymentId: {
+    type: String,
+    trim: true,
   },
   dni: {
     type: String,

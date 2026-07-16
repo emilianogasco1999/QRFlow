@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import Registration from "@/models/Registration";
 import { cookies } from "next/headers";
+import { verifySessionToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 async function isAuthorized(): Promise<boolean> {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get("admin_auth");
-  return !!(authCookie && authCookie.value === "true");
+  return verifySessionToken(authCookie?.value);
 }
 
 export async function GET(req: Request) {

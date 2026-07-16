@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import Registration from "@/models/Registration";
 import EventConfig from "@/models/EventConfig";
+import { createPaymentPreference } from "@/lib/mercadopago";
 import { Resend } from "resend";
 import fs from "fs";
 import path from "path";
@@ -25,11 +26,18 @@ export async function POST(req: Request) {
 
     await dbConnect();
     const body = await req.json();
-    const { registrationId } = body;
+    const { registrationId, itemType } = body;
 
     if (!registrationId) {
       return NextResponse.json(
         { success: false, error: "Falta el dato obligatorio (registrationId)" },
+        { status: 400 },
+      );
+    }
+
+    if (itemType !== "ticket" && itemType !== "card") {
+      return NextResponse.json(
+        { success: false, error: "El itemType debe ser 'ticket' o 'card'" },
         { status: 400 },
       );
     }
@@ -53,16 +61,28 @@ export async function POST(req: Request) {
       }
     }
 
-    // Usar API de QRServer para renderizar el QR en tiempo real desde el mail
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${user.qrToken}`;
+    // Obtener origen del request
+    const origin = req.headers.get("origin") || "http://localhost:3000";
 
-    // Estilo HTML del Mail - Tema Spotify Oscuro Premium
+    // Generar la preferencia de Mercado Pago
+    const result = await createPaymentPreference(
+      registrationId,
+      itemType,
+      origin,
+    );
+
+    // Decidir dinámicamente si usar Sandbox o Producción basándonos en el tipo de Access Token
+    const isProdToken =
+      process.env.MERCADOPAGO_ACCESS_TOKEN?.startsWith("APP_USR-");
+    const paymentUrl = isProdToken ? result.initPoint : result.sandboxInitPoint;
+
+    // Estilo HTML del Mail - Tema Spotify Oscuro Premium adaptado para pagos
     const emailHtml = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
-          <title>Tu Invitación al Club</title>
+          <title>Completa tu pago - Local Social Club</title>
           <style>
             body {
               background-color: #0b0b0b;
@@ -100,6 +120,7 @@ export async function POST(req: Request) {
               margin: 0;
               font-weight: 500;
               letter-spacing: 0.5px;
+              text-transform: uppercase;
             }
             .content {
               padding: 32px;
@@ -118,26 +139,20 @@ export async function POST(req: Request) {
               margin-top: 0;
               margin-bottom: 28px;
             }
-            .qr-container {
-              background: rgba(255, 255, 255, 0.02);
-              border: 1px solid rgba(255, 255, 255, 0.06);
-              border-radius: 20px;
-              padding: 24px;
-              display: inline-block;
-              margin-bottom: 28px;
-              box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+            .btn-pay-container {
+              margin: 32px 0;
             }
-            .qr-wrapper {
-              background-color: #ffffff;
-              padding: 16px;
-              border-radius: 12px;
+            .btn-pay {
+              background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%);
+              color: #ffffff !important;
+              text-decoration: none;
+              font-size: 15px;
+              font-weight: 700;
+              padding: 16px 36px;
+              border-radius: 50px;
               display: inline-block;
-              box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-            }
-            .qr-image {
-              display: block;
-              width: 180px;
-              height: 180px;
+              box-shadow: 0 10px 20px rgba(0, 158, 227, 0.3);
+              letter-spacing: 0.5px;
             }
             .details-box {
               background-color: rgba(255, 255, 255, 0.02);
@@ -192,39 +207,39 @@ export async function POST(req: Request) {
         <body>
           <div class="email-container">
             <div class="header">
-              <h1>Te damos la bienvenida al club</h1>
-              <p class="subtitle">LOCAL SOCIAL CLUB ACCESS CONTROL</p>
+              <h1>Completa tu Pago</h1>
+              <p class="subtitle">LOCAL SOCIAL CLUB PAYMENT</p>
             </div>
             <div class="content">
-              <p class="salutation">Hola ${user.fullName}</p>
-              <p>Tu solicitud de acceso ha sido aprobada. Presentá este código QR único al ingresar al evento. Recordá que tu entrada es personal e intransferible.</p>
-              <div class="qr-container">
-                <div class="qr-wrapper">
-                  <img class="qr-image" src="cid:qr-code" alt="Código QR de Invitación" />
-                </div>
+              <p class="salutation">Hola ${user.fullName},</p>
+              <p>Para confirmar tu acceso al evento de forma definitiva, por favor realizá el pago correspondiente utilizando el botón de abajo.</p>
+              
+              <div class="btn-pay-container">
+                <a class="btn-pay" href="${paymentUrl}" target="_blank">PAGAR CON MERCADO PAGO</a>
               </div>
+
               <div class="details-box">
                 <div class="detail-row">
-                  <span class="detail-label">Nombre:</span>
-                  <span class="detail-value">${user.fullName}</span>
+                  <span class="detail-label">Concepto:</span>
+                  <span class="detail-value">${result.title}</span>
                 </div>
                 <div class="detail-row">
-                  <span class="detail-label">DNI:</span>
-                  <span class="detail-value">${user.dni}</span>
+                  <span class="detail-label">Monto:</span>
+                  <span class="detail-value">$${result.unitPrice} ARS</span>
                 </div>
-                <div class="detail-row">
-                  <span class="detail-label">Fecha:</span>
-                  <span class="detail-value">${formattedDate}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Hora:</span>
-                  <span class="detail-value">${eventConfig?.time || "-"}</span>
-                </div>
+                // <div class="detail-row">
+                //   <span class="detail-label">Fecha del Evento:</span>
+                //   <span class="detail-value">${formattedDate}</span>
+                // </div>
+                // <div class="detail-row">
+                //   <span class="detail-label">Hora:</span>
+                //   <span class="detail-value">${eventConfig?.time || "-"}</span>
+                // </div>
               </div>
             </div>
             <div class="footer">
               <div class="footer-note">
-                Este correo es automático. No responder este mail
+                Este correo es automático. No responder este mail.
               </div>
               <div class="brand">
                 Local Social Club &copy; 2026
@@ -239,7 +254,7 @@ export async function POST(req: Request) {
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
 
-    // 1. Si está configurado SMTP (Gmail), usamos Nodemailer para enviar a cualquier persona sin dominio
+    // 1. Enviar por SMTP (Gmail) si está configurado
     if (smtpUser && smtpPass) {
       const nodemailer = (await import("nodemailer")).default;
       const transporter = nodemailer.createTransport({
@@ -253,87 +268,59 @@ export async function POST(req: Request) {
       await transporter.sendMail({
         from: `"Local Social Club" <${smtpUser}>`,
         to: user.email,
-        subject: "Tu invitación con código QR - Bienvenido al Club",
+        subject: `Enlace de Pago - ${result.title}`,
         html: emailHtml,
-        attachments: [
-          {
-            filename: "qr.png",
-            path: qrUrl,
-            cid: "qr-code", // coincide con src="cid:qr-code" en el HTML
-          },
-        ],
       });
-
-      // Actualizar estado en base de datos
-      user.emailSent = true;
-      await user.save();
 
       return NextResponse.json({ success: true, method: "smtp" });
     }
 
-    // 2. Si no hay SMTP pero sí Resend API Key, usamos Resend
+    // 2. Enviar por Resend si está la API Key
     if (resendApiKey && resendApiKey !== "YOUR_RESEND_API_KEY") {
       const resend = new Resend(resendApiKey);
       const { data, error } = await resend.emails.send({
         from: "Local Social Club <onboarding@resend.dev>",
         to: [user.email],
-        subject: "Tu invitación con código QR - Bienvenido al Club",
+        subject: `Enlace de Pago - ${result.title}`,
         html: emailHtml,
-        attachments: [
-          {
-            path: qrUrl,
-            filename: "qr.png",
-            inlineContentId: "qr-code",
-          },
-        ],
       });
 
       if (error) {
         console.error("Error de la API de Resend:", error);
         return NextResponse.json(
-          {
-            success: false,
-            error: "Error de Resend: " + error.message,
-            details: error,
-          },
+          { success: false, error: "Error de Resend: " + error.message },
           { status: 400 },
         );
       }
 
-      // Actualizar estado en base de datos
-      user.emailSent = true;
-      await user.save();
-
       return NextResponse.json({ success: true, method: "resend", data });
     }
 
-    // 3. MOCK FALLBACK: Guardar el mail en un archivo local para testing sin requerir credenciales
+    // 3. MOCK FALLBACK: Guardar el mail localmente
     const scratchDir = path.join(process.cwd(), "scratch");
     if (!fs.existsSync(scratchDir)) {
       fs.mkdirSync(scratchDir);
     }
-    // Reemplazar cid por url real para que se previsualice en el navegador local
-    const previewHtml = emailHtml.replace("cid:qr-code", qrUrl);
-    fs.writeFileSync(path.join(scratchDir, "last-email.html"), previewHtml);
-
-    // Actualizar estado en base de datos
-    user.emailSent = true;
-    await user.save();
+    fs.writeFileSync(
+      path.join(scratchDir, "last-payment-email.html"),
+      emailHtml,
+    );
 
     console.log(
-      "Ni SMTP ni RESEND_API_KEY configuradas. Email simulado guardado en scratch/last-email.html",
+      "Simulador: Email de link de pago guardado en scratch/last-payment-email.html",
     );
     return NextResponse.json({
       success: true,
       mocked: true,
-      message: "Email simulado guardado localmente en scratch/last-email.html",
+      message: "Email simulado guardado en scratch/last-payment-email.html",
+      paymentUrl,
     });
   } catch (error: any) {
-    console.error("Error en /api/admin/send-email:", error);
+    console.error("Error en /api/admin/send-payment-link:", error);
     return NextResponse.json(
       {
         success: false,
-        error: "Error enviando correo electrónico: " + error.message,
+        error: "Error enviando correo electrónico de pago: " + error.message,
       },
       { status: 500 },
     );

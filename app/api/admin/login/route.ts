@@ -3,6 +3,7 @@ import { dbConnect } from "@/lib/db";
 import User from "@/models/User";
 import crypto from "crypto";
 import { cookies } from "next/headers";
+import { createSessionToken } from "@/lib/auth";
 
 function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password).digest("hex");
@@ -52,7 +53,8 @@ export async function POST(req: NextRequest) {
 
     // Iniciar sesión y setear cookie HTTP-Only segura
     const cookieStore = await cookies();
-    cookieStore.set("admin_auth", "true", {
+    const sessionToken = createSessionToken(cleanUsername);
+    cookieStore.set("admin_auth", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",

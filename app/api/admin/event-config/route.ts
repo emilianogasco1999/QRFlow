@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import EventConfig from "@/models/EventConfig";
 import { cookies } from "next/headers";
+import { verifySessionToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 async function isAuthorized(): Promise<boolean> {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get("admin_auth");
-  return !!(authCookie && authCookie.value === "true");
+  return verifySessionToken(authCookie?.value);
 }
 
 export async function GET() {
@@ -24,7 +25,7 @@ export async function GET() {
     let config = await EventConfig.findOne();
     if (!config) {
       // Retorna valores vacíos por defecto si no existe
-      config = new EventConfig({ date: "", time: "" });
+      config = new EventConfig({ date: "", time: "", ticketPrice: 0, cardPrice: 0 });
     }
 
     return NextResponse.json({
@@ -51,11 +52,17 @@ export async function POST(req: Request) {
 
     await dbConnect();
     const body = await req.json();
-    const { date, time } = body;
+    const { date, time, ticketPrice, cardPrice } = body;
+
+    const updateFields: any = {};
+    if (date !== undefined) updateFields.date = date;
+    if (time !== undefined) updateFields.time = time;
+    if (ticketPrice !== undefined) updateFields.ticketPrice = ticketPrice;
+    if (cardPrice !== undefined) updateFields.cardPrice = cardPrice;
 
     const config = await EventConfig.findOneAndUpdate(
       {},
-      { date: date || "", time: time || "" },
+      updateFields,
       { new: true, upsert: true }
     );
 

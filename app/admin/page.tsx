@@ -34,6 +34,7 @@ interface RegistrationItem {
   attended?: boolean;
   dni?: string;
   paid: boolean;
+  paymentId: string;
 }
 
 export default function AdminDashboard() {
@@ -96,12 +97,21 @@ export default function AdminDashboard() {
   const [isDniSaving, setIsDniSaving] = useState(false);
   const [dniError, setDniError] = useState("");
 
-  // Estados para Configuración de Fecha y Hora del Evento
+  // Estados para Configuración de Fecha, Hora y Precios del Evento
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
+  const [ticketPrice, setTicketPrice] = useState<number>(0);
   const [isConfigSaving, setIsConfigSaving] = useState(false);
   const [configError, setConfigError] = useState("");
+
+  // Estados para envío de mails de pago por usuario
+  const [paymentEmailStatus, setPaymentEmailStatus] = useState<
+    Record<string, "idle" | "sending" | "success" | "error">
+  >({});
+  const [paymentStatusMessage, setPaymentStatusMessage] = useState<
+    Record<string, string>
+  >({});
 
   // Estados para Carga de Pago
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -109,6 +119,10 @@ export default function AdminDashboard() {
     useState<RegistrationItem | null>(null);
   const [isPaymentSaving, setIsPaymentSaving] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [isPaymentIdCopied, setIsPaymentIdCopied] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetError, setResetError] = useState("");
 
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -199,6 +213,7 @@ export default function AdminDashboard() {
       if (res.ok && data.success && data.config) {
         setEventDate(data.config.date || "");
         setEventTime(data.config.time || "");
+        setTicketPrice(data.config.ticketPrice || 0);
       }
     } catch (err) {
       console.error("Error al obtener la configuración del evento:", err);
@@ -335,6 +350,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           date: eventDate,
           time: eventTime,
+          ticketPrice,
         }),
       });
       const data = await res.json();
@@ -437,6 +453,81 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSendPaymentEmail = async (user: RegistrationItem) => {
+    setPaymentEmailStatus((prev) => ({ ...prev, [user._id]: "sending" }));
+    setPaymentStatusMessage((prev) => ({ ...prev, [user._id]: "" }));
+
+    try {
+      const res = await fetch("/api/admin/send-payment-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          registrationId: user._id,
+          itemType: "ticket",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Error enviando correo de pago.");
+      }
+
+      setPaymentEmailStatus((prev) => ({ ...prev, [user._id]: "success" }));
+
+      if (data.mocked) {
+        setPaymentStatusMessage((prev) => ({
+          ...prev,
+          [user._id]: "Guardado en scratch/last-payment-email.html",
+        }));
+      } else {
+        setPaymentStatusMessage((prev) => ({
+          ...prev,
+          [user._id]: "Mail de pago enviado ✅",
+        }));
+      }
+    } catch (err: any) {
+      console.error(err);
+      setPaymentEmailStatus((prev) => ({ ...prev, [user._id]: "error" }));
+      setPaymentStatusMessage((prev) => ({
+        ...prev,
+        [user._id]: err.message || "Error",
+      }));
+    }
+  };
+
+  const handleWhatsAppPayment = async (user: RegistrationItem) => {
+    try {
+      const res = await fetch("/api/mercadopago/preference", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          registrationId: user._id,
+          itemType: "ticket",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.error || "Error al generar la preferencia de pago.",
+        );
+      }
+
+      // En desarrollo usamos sandboxInitPoint, en producción initPoint
+      const paymentUrl = data.sandboxInitPoint || data.initPoint;
+
+      const message = encodeURIComponent(
+        `¡Hola ${user.fullName}! Te dejamos el link para completar el pago de tu entrada: ${paymentUrl} una vez pagado, espera 5 segundos a que mercado pago te redirija a nuestra pagina para confirmar el pago o toca en el link que te proporcionan ellos`,
+      );
+
+      const whatsappPhone = user.whatsapp.replace(/\+/g, "").trim();
+      window.open(`https://wa.me/${whatsappPhone}?text=${message}`, "_blank");
+    } catch (err: any) {
+      console.error("Error en WhatsApp Pago:", err);
+      alert("Error al generar el link de WhatsApp: " + err.message);
+    }
+  };
+
   const handleDeleteDatabase = async () => {
     setIsDeleting(true);
     try {
@@ -453,6 +544,28 @@ export default function AdminDashboard() {
       setError(err.message);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleResetStatuses = async () => {
+    setIsResetting(true);
+    setResetError("");
+    try {
+      const res = await fetch("/api/admin/reset-status", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.error || "Error al reiniciar los estados de los invitados.",
+        );
+      }
+      setIsResetModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      setResetError(err.message);
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -797,6 +910,15 @@ export default function AdminDashboard() {
                 <option value="not-attended">NO VINO</option>
               </select>
 
+              <button
+                onClick={() => setIsResetModalOpen(true)}
+                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1.5"
+                title="Reiniciar todos los estados del evento"
+              >
+                <RefreshCw size={13} />
+                Reiniciar Estados
+              </button>
+
               {filterStatus === "sent" && (
                 <button
                   onClick={() => setIsScannerOpen(true)}
@@ -848,6 +970,9 @@ export default function AdminDashboard() {
                     {paginatedList.map((user) => {
                       const status = emailStatus[user._id] || "idle";
                       const statusMsg = statusMessage[user._id] || "";
+                      const paymentStatus =
+                        paymentEmailStatus[user._id] || "idle";
+                      const paymentMsg = paymentStatusMessage[user._id] || "";
 
                       return (
                         <tr
@@ -1007,6 +1132,34 @@ export default function AdminDashboard() {
                                 </>
                               )}
 
+                              {/* Cobros Mercado Pago */}
+                              {!user.paid && (
+                                <div className="w-full border-t border-white/5 my-1 pt-1 space-y-1">
+                                  <button
+                                    onClick={() => handleSendPaymentEmail(user)}
+                                    disabled={paymentStatus === "sending"}
+                                    className="flex items-center justify-center gap-1 w-full bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all active:scale-95"
+                                  >
+                                    {paymentStatus === "sending" ? (
+                                      <Loader2
+                                        className="animate-spin"
+                                        size={8}
+                                      />
+                                    ) : (
+                                      <Mail size={8} />
+                                    )}
+                                    Mail Pago
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleWhatsAppPayment(user)}
+                                    className="flex items-center justify-center gap-1 w-full bg-green-600 hover:bg-green-500 text-white px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all active:scale-95"
+                                  >
+                                    WSP Pago
+                                  </button>
+                                </div>
+                              )}
+
                               {user.emailSent && status === "idle" && (
                                 <span className="text-[9px] text-green-400 font-medium">
                                   Enviado
@@ -1024,6 +1177,20 @@ export default function AdminDashboard() {
                                   }`}
                                 >
                                   {statusMsg}
+                                </span>
+                              )}
+
+                              {paymentMsg && (
+                                <span
+                                  className={`text-[9px] mt-0.5 font-medium ${
+                                    paymentStatus === "success"
+                                      ? "text-green-400"
+                                      : paymentStatus === "error"
+                                        ? "text-spotify-error"
+                                        : "text-spotify-text-secondary"
+                                  }`}
+                                >
+                                  {paymentMsg}
                                 </span>
                               )}
 
@@ -1052,6 +1219,8 @@ export default function AdminDashboard() {
                 {paginatedList.map((user) => {
                   const status = emailStatus[user._id] || "idle";
                   const statusMsg = statusMessage[user._id] || "";
+                  const paymentStatus = paymentEmailStatus[user._id] || "idle";
+                  const paymentMsg = paymentStatusMessage[user._id] || "";
 
                   return (
                     <div
@@ -1210,6 +1379,31 @@ export default function AdminDashboard() {
                           </>
                         )}
 
+                        {/* Cobros Mercado Pago */}
+                        {!user.paid && (
+                          <div className="flex gap-2 w-full mt-1">
+                            <button
+                              onClick={() => handleSendPaymentEmail(user)}
+                              disabled={paymentStatus === "sending"}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95 bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
+                            >
+                              {paymentStatus === "sending" ? (
+                                <Loader2 className="animate-spin" size={12} />
+                              ) : (
+                                <Mail size={12} />
+                              )}
+                              Mail Pago
+                            </button>
+
+                            <button
+                              onClick={() => handleWhatsAppPayment(user)}
+                              className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-500 text-white py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all active:scale-95"
+                            >
+                              WSP Pago
+                            </button>
+                          </div>
+                        )}
+
                         {statusMsg && (
                           <span
                             className={`text-center text-[10px] mt-1 font-medium ${
@@ -1221,6 +1415,20 @@ export default function AdminDashboard() {
                             }`}
                           >
                             {statusMsg}
+                          </span>
+                        )}
+
+                        {paymentMsg && (
+                          <span
+                            className={`text-center text-[10px] mt-1 font-medium ${
+                              paymentStatus === "success"
+                                ? "text-green-400"
+                                : paymentStatus === "error"
+                                  ? "text-spotify-error"
+                                  : "text-spotify-text-secondary"
+                            }`}
+                          >
+                            {paymentMsg}
                           </span>
                         )}
 
@@ -1299,6 +1507,61 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* Modal de Confirmación para reiniciar estados */}
+      {isResetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-spotify-surface border border-white/10 max-w-md w-full rounded-2xl p-6 spotify-shadow-heavy">
+            <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <RefreshCw size={18} className="text-red-500" />
+              ¿Reiniciar estados del evento?
+            </h2>
+            <p className="text-spotify-text-secondary text-xs mb-6 leading-relaxed">
+              Esta acción restablecerá el estado de{" "}
+              <strong>pago, mails enviados y asistencia</strong> a pendiente
+              para todos los invitados. También se eliminarán los registros de
+              transacción (paymentId). Los datos personales de los invitados no
+              serán alterados. Esta acción no se puede deshacer.
+            </p>
+
+            {resetError && (
+              <div className="text-[11px] text-spotify-error bg-spotify-error/10 border border-spotify-error/20 p-2.5 rounded-lg font-medium text-center mb-4">
+                {resetError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setIsResetModalOpen(false);
+                  setResetError("");
+                }}
+                disabled={isResetting}
+                className="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResetStatuses}
+                disabled={isResetting}
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50"
+              >
+                {isResetting ? (
+                  <>
+                    <Loader2 className="animate-spin" size={12} />
+                    Reiniciando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={12} />
+                    Sí, reiniciar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Confirmación para borrar base de datos */}
       {isDeleteOpen && (
@@ -1642,6 +1905,36 @@ export default function AdminDashboard() {
                 <strong>{paymentTargetUser.fullName || "Sin Nombre"}</strong> (@
                 {paymentTargetUser.instagram})
               </p>
+
+              {paymentTargetUser.paymentId && (
+                <div className="w-full bg-black/35 border border-white/5 p-3 rounded-xl mt-3 text-left space-y-1">
+                  <span className="block text-spotify-text-secondary uppercase font-bold text-[9px] tracking-wider">
+                    Operación Mercado Pago
+                  </span>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <span className="text-white font-mono font-semibold text-[11px] select-all break-all leading-tight">
+                      {paymentTargetUser.paymentId}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          paymentTargetUser.paymentId || "",
+                        );
+                        setIsPaymentIdCopied(true);
+                        setTimeout(() => setIsPaymentIdCopied(false), 2000);
+                      }}
+                      className={`text-[10px] hover:underline font-bold uppercase tracking-wider flex-shrink-0 transition-colors ${
+                        isPaymentIdCopied
+                          ? "text-green-400 font-extrabold"
+                          : "text-spotify-text-primary"
+                      }`}
+                    >
+                      {isPaymentIdCopied ? "¡Copiado!" : "Copiar"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {paymentError && (
@@ -1676,6 +1969,7 @@ export default function AdminDashboard() {
                   setIsPaymentModalOpen(false);
                   setPaymentTargetUser(null);
                   setPaymentError("");
+                  setIsPaymentIdCopied(false);
                 }}
                 disabled={isPaymentSaving}
                 className="w-full text-center text-spotify-text-secondary hover:text-white transition-colors text-xs font-bold uppercase tracking-wider py-1.5 mt-1"
@@ -1816,6 +2110,21 @@ export default function AdminDashboard() {
                   value={eventTime}
                   onChange={(e) => setEventTime(e.target.value)}
                   className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full px-4 py-2.5 text-xs text-white focus:outline-none transition-colors [color-scheme:dark]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-spotify-text-secondary text-[10px] uppercase font-bold tracking-wider mb-1.5 pl-1">
+                  Precio de Entrada ($)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  placeholder="Ej: 1500"
+                  value={ticketPrice || ""}
+                  onChange={(e) => setTicketPrice(Number(e.target.value))}
+                  className="w-full bg-spotify-button hover:bg-spotify-card border border-white/10 focus:border-white/20 rounded-full px-4 py-2.5 text-xs text-white focus:outline-none transition-colors"
                 />
               </div>
 

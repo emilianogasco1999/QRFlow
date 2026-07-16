@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { dbConnect } from "@/lib/db";
 import User from "@/models/User";
 import crypto from "crypto";
+import { verifySessionToken } from "@/lib/auth";
 
 function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password).digest("hex");
@@ -11,7 +12,7 @@ function hashPassword(password: string): string {
 async function isAuthorized(): Promise<boolean> {
   const cookieStore = await cookies();
   const authCookie = cookieStore.get("admin_auth");
-  return !!(authCookie && authCookie.value === "true");
+  return verifySessionToken(authCookie?.value);
 }
 
 export async function POST(req: NextRequest) {
