@@ -221,33 +221,16 @@ export async function sendQrEmail(registrationId: string): Promise<{
                 <span class="detail-label">Hora:</span>
                 <span class="detail-value">${eventConfig?.time || "-"}</span>
               </div>
-              ${eventConfig?.location ? `
+              ${
+                eventConfig?.location
+                  ? `
               <div class="detail-row">
                 <span class="detail-label">Lugar:</span>
                 <span class="detail-value">${eventConfig.location}</span>
               </div>
-              ` : ""}
-              ${eventConfig?.entryLimit ? `
-              <div class="detail-row">
-                <span class="detail-label">Ingreso hasta:</span>
-                <span class="detail-value">${eventConfig.entryLimit}</span>
-              </div>
-              ` : ""}
-            </div>
-
-            <div class="info-box">
-              <div class="info-item">
-                <span class="info-icon">🎁</span>
-                <div class="info-content">
-                  <strong>Tu entrada incluye:</strong> vaso, hielo y sorpresas toda la noche.
-                </div>
-              </div>
-              <div class="info-item">
-                <span class="info-icon">⚠️</span>
-                <div class="info-content">
-                  <strong>Importante:</strong> No vendemos alcohol. ¡Traé lo que vayas a consumir!
-                </div>
-              </div>
+              `
+                  : ""
+              }
             </div>
           </div>
           <div class="footer">
@@ -336,7 +319,7 @@ export async function sendQrEmail(registrationId: string): Promise<{
   await user.save();
 
   console.log(
-    "Ni SMTP ni RESEND_API_KEY configuradas. Email simulado guardado en scratch/last-email.html"
+    "Ni SMTP ni RESEND_API_KEY configuradas. Email simulado guardado en scratch/last-email.html",
   );
   return {
     success: true,
