@@ -56,6 +56,20 @@ export async function GET(req: Request) {
         { dob: searchRegex },
       ];
 
+      // Soporte para rango de años (ej: "1980 a 1999", "1980-1999", "1980 - 1999", "1980 hasta 1999")
+      const yearRangeMatch = trimmed.match(
+        /^(\d{4})\s*(?:a|al|hasta|-|\s+)\s*(\d{4})$/i,
+      );
+      if (yearRangeMatch) {
+        const y1 = parseInt(yearRangeMatch[1], 10);
+        const y2 = parseInt(yearRangeMatch[2], 10);
+        const minYear = Math.min(y1, y2);
+        const maxYear = Math.max(y1, y2);
+        orConditions.push({
+          dob: { $gte: `${minYear}-01-01`, $lte: `${maxYear}-12-31` },
+        });
+      }
+
       // Si el término de búsqueda está en formato DD-MM-YYYY o DD/MM/YYYY (ej: 05-04-1999)
       const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
       if (ddmmyyyyMatch) {

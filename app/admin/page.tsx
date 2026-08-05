@@ -911,7 +911,7 @@ export default function AdminDashboard() {
               </span>
               <input
                 type="text"
-                placeholder="Buscar por instagram, whatsapp, email, fecha (ej. 1999, 05-04-1999)..."
+                placeholder="Buscar por instagram, whatsapp, email, fecha (ej. 1999, 1980 a 1999, 05-04-1999)..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
