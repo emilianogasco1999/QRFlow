@@ -176,11 +176,11 @@ export default function UserForm() {
                   <br />
                   Nuevas conversaciones. Nuevos amigos. Nuevas historias.
                 </p>
-                <div className="pt-1.5">
+                {/* <div className="pt-1.5">
                   <span className="inline-block bg-black/20 border border-[#f2e5d7]/15 text-[#f2e5d7] text-[10px] font-bold px-3.5 py-1 rounded-full uppercase tracking-widest">
                     +25 únicamente
                   </span>
-                </div>
+                </div> */}
               </div>
 
               {/* Formulario vertical apilado */}

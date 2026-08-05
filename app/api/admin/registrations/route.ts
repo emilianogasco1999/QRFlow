@@ -43,13 +43,40 @@ export async function GET(req: Request) {
     }
 
     if (search.trim()) {
-      const searchRegex = new RegExp(search.trim(), "i");
-      query.$or = [
+      const trimmed = search.trim();
+      const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escaped, "i");
+
+      const orConditions: any[] = [
         { instagram: searchRegex },
         { whatsapp: searchRegex },
         { email: searchRegex },
-        { dni: searchRegex }
+        { dni: searchRegex },
+        { fullName: searchRegex },
+        { dob: searchRegex },
       ];
+
+      // Si el término de búsqueda está en formato DD-MM-YYYY o DD/MM/YYYY (ej: 05-04-1999)
+      const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      if (ddmmyyyyMatch) {
+        const [, day, month, year] = ddmmyyyyMatch;
+        const paddedDay = day.padStart(2, "0");
+        const paddedMonth = month.padStart(2, "0");
+        const convertedDate = `${year}-${paddedMonth}-${paddedDay}`;
+        orConditions.push({ dob: new RegExp(convertedDate, "i") });
+      }
+
+      // Si el término está en formato DD-MM o DD/MM (ej: 05-04)
+      const ddmmMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})$/);
+      if (ddmmMatch) {
+        const [, day, month] = ddmmMatch;
+        const paddedDay = day.padStart(2, "0");
+        const paddedMonth = month.padStart(2, "0");
+        const convertedDate = `-${paddedMonth}-${paddedDay}`;
+        orConditions.push({ dob: new RegExp(convertedDate, "i") });
+      }
+
+      query.$or = orConditions;
     }
 
     const [list, total] = await Promise.all([
