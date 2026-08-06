@@ -559,21 +559,21 @@ export default function AdminDashboard() {
       // La API resuelve dinámicamente si es Sandbox o Producción según el token configurado
       const paymentUrl = data.paymentUrl;
 
-      const messageText = `¡Hola ${user.fullName}! ¡Qué bueno que te sumes a esta experiencia! 🥂
+      const messageText = `¡Hola ${user.fullName}! ¡Qué bueno que te sumes a esta experiencia! \u{1F942}
 
 Este viernes, junto a La Quipi, vamos a compartir una noche diferente: vino, gastronomía, nuevas conexiones y dinámicas pensadas para conocer gente en un ambiente relajado y divertido.
 
-💰Asegura tu lugar con transferencia o efectivo (el alias)
+\u{1F4B0}Asegura tu lugar con transferencia o efectivo (el alias)
 
-👉 Accedé a tu link de pago desde el siguiente enlace:
+\u{1F449} Accedé a tu link de pago desde el siguiente enlace:
 ${paymentUrl}
 
 El link acepta todos los medios de pago.
 
 Una vez confirmado el pago, vas a recibir tu QR de ingreso.
 
-📍 La ubicación exacta del evento se enviará junto con tu QR.
-🕘 Viernes 7 de agosto | 21:00 hs
+\u{1F4CD} La ubicación exacta del evento se enviará junto con tu QR.
+\u{1F558} Viernes 7 de agosto | 21:00 hs
 
 Podés venir solo/a o acompañado/a. Nosotros nos ocupamos de que sea una noche para disfrutar y conectar con personas nuevas.
 
@@ -584,7 +584,10 @@ La Quipi & Local Social Club`;
       const message = encodeURIComponent(messageText);
 
       const whatsappPhone = user.whatsapp.replace(/\+/g, "").trim();
-      window.open(`https://wa.me/${whatsappPhone}?text=${message}`, "_blank");
+      window.open(
+        `https://api.whatsapp.com/send?phone=${whatsappPhone}&text=${message}`,
+        "_blank",
+      );
     } catch (err: any) {
       console.error("Error en WhatsApp Pago:", err);
       alert("Error al generar el link de WhatsApp: " + err.message);
