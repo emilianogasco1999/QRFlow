@@ -51,10 +51,10 @@ export async function createPaymentPreference(
 
   if (itemType === "ticket") {
     unitPrice = config.ticketPrice || 0;
-    title = "Friends Edition LSC";
+    title = "reserva y asegurá tu lugar";
   } else if (itemType === "card") {
     unitPrice = config.cardPrice || 0;
-    title = "Friends Edition LSC";
+    title = "reserva y asegurá tu lugar";
   }
 
   if (unitPrice <= 0) {

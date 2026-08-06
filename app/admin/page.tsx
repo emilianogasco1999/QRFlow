@@ -378,7 +378,9 @@ export default function AdminDashboard() {
     if (!paymentTargetUser) return;
     setIsPaymentSaving(true);
     setPaymentError("");
-    setPaymentProgressText(paidValue ? "Registrando pago..." : "Cancelando pago...");
+    setPaymentProgressText(
+      paidValue ? "Registrando pago..." : "Cancelando pago...",
+    );
     try {
       // 1. Guardar estado de pago en base de datos
       const res = await fetch("/api/admin/registrations", {
@@ -413,10 +415,16 @@ export default function AdminDashboard() {
           if (emailRes.ok && emailData.success) {
             emailSentSuccess = true;
           } else {
-            console.warn("Error enviando email en la automatización de pago:", emailData.error);
+            console.warn(
+              "Error enviando email en la automatización de pago:",
+              emailData.error,
+            );
           }
         } catch (emailErr) {
-          console.error("Fallo al enviar correo en la automatización de pago:", emailErr);
+          console.error(
+            "Fallo al enviar correo en la automatización de pago:",
+            emailErr,
+          );
         }
       }
 
@@ -551,9 +559,29 @@ export default function AdminDashboard() {
       // La API resuelve dinámicamente si es Sandbox o Producción según el token configurado
       const paymentUrl = data.paymentUrl;
 
-      const message = encodeURIComponent(
-        `¡Hola ${user.fullName}! Te dejamos el link para completar el pago de tu entrada: ${paymentUrl} una vez pagado, espera 5 segundos a que mercado pago te redirija a nuestra pagina para confirmar el pago o toca en el link que te proporcionan ellos`,
-      );
+      const messageText = `¡Hola ${user.fullName}! ¡Qué bueno que te sumes a esta experiencia! 🥂
+
+Este viernes, junto a La Quipi, vamos a compartir una noche diferente: vino, gastronomía, nuevas conexiones y dinámicas pensadas para conocer gente en un ambiente relajado y divertido.
+
+💰Asegura tu lugar con transferencia o efectivo (el alias)
+
+👉 Accedé a tu link de pago desde el siguiente enlace:
+${paymentUrl}
+
+El link acepta todos los medios de pago.
+
+Una vez confirmado el pago, vas a recibir tu QR de ingreso.
+
+📍 La ubicación exacta del evento se enviará junto con tu QR.
+🕘 Viernes 7 de agosto | 21:00 hs
+
+Podés venir solo/a o acompañado/a. Nosotros nos ocupamos de que sea una noche para disfrutar y conectar con personas nuevas.
+
+¡Nos vemos muy pronto!
+
+La Quipi & Local Social Club`;
+
+      const message = encodeURIComponent(messageText);
 
       const whatsappPhone = user.whatsapp.replace(/\+/g, "").trim();
       window.open(`https://wa.me/${whatsappPhone}?text=${message}`, "_blank");
